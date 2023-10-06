@@ -2,6 +2,11 @@
 name = "rreader"
 version = "0.1.0"
 edition = "2021"
+authors = ["Jeremy S <Jeremy@jsmoog.com>"]
+description = "A CLI ebook reader and converter"
+readme = "README.md"
+repository = "https://github.com/JMoogs/rreader"
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
