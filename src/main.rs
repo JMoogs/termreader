@@ -23,7 +23,7 @@ fn main() -> Result<(), anyhow::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app_state = AppState::new();
+    let mut app_state = AppState::build();
     let res = run_app(&mut terminal, &mut app_state);
 
     // Restore terminal on ending:
@@ -62,10 +62,10 @@ fn run_app<B: Backend>(
                 CurrentScreen::Main => match key.code {
                     event::KeyCode::Esc | event::KeyCode::Char('q') => break,
                     event::KeyCode::Char(']') => {
-                        app_state.current_tab = app_state.current_tab.map(|mut f| f.get_next_tab());
+                        app_state.current_tab.next();
                     }
                     event::KeyCode::Char('[') => {
-                        app_state.current_tab = app_state.current_tab.map(|mut f| f.get_prev_tab());
+                        app_state.current_tab.previous();
                     }
                     _ => (),
                 },
