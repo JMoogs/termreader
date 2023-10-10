@@ -9,7 +9,7 @@ pub fn ui_main<B: Backend>(f: &mut Frame<B>, app_state: &AppState) {
 
     render_tabs(chunks[0], app_state, f);
 
-    let inner = match app_state.current_tab.index {
+    match app_state.current_tab.index {
         0 => render_lib(chunks[1], f),
         1 => render_updates(chunks[1], f),
         2 => render_sources(chunks[1], f),

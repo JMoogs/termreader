@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 pub struct AppState {
     pub(crate) current_screen: CurrentScreen,
     pub(crate) current_tab: MainScreenTabs,
@@ -48,4 +50,74 @@ pub enum CurrentScreen {
     Main,
     Reader,
     ExitingReader,
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct ID {
+    id: usize,
+}
+
+impl ID {
+    pub fn new(id: usize) -> Self {
+        Self { id }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct LibraryInfo {
+    name: String,
+    source_data: BookSource,
+}
+
+impl LibraryInfo {
+    pub fn display_info(&self) -> String {
+        match self.source_data.clone() {
+            BookSource::Local(data) => {
+                let percent_through = data.current_page as f64 / data.total_pages as f64;
+                format!(
+                    "{} | Page: {}/{} ({:.2}%)",
+                    self.name, data.current_page, data.total_pages, percent_through
+                )
+            }
+            BookSource::Global(data) => {
+                let percent_through = data.read_chapters as f64 / data.total_chapters as f64;
+                if data.unread_downloaded_chapters > 0 {
+                    format!(
+                        "{} | Chapter: {}/{} ({:.2}%) | Downloaded: {}",
+                        self.name,
+                        data.read_chapters,
+                        data.total_chapters,
+                        percent_through,
+                        data.unread_downloaded_chapters
+                    )
+                } else {
+                    format!(
+                        "{} | Chapter: {}/{} ({:.2}%)",
+                        self.name, data.read_chapters, data.total_chapters, percent_through
+                    )
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+enum BookSource {
+    Local(LocalBookData),
+    Global(GlobalBookData),
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+struct LocalBookData {
+    path_to_book: String,
+    current_page: usize,
+    total_pages: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+struct GlobalBookData {
+    path_to_book: String,
+    read_chapters: usize,
+    total_chapters: usize,
+    unread_downloaded_chapters: usize,
 }
