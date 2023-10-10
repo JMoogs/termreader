@@ -1,3 +1,7 @@
+// Temporary
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 use appstate::{AppState, CurrentScreen};
 use crossterm::{
     event::{self, Event},
@@ -6,8 +10,12 @@ use crossterm::{
 use ratatui::prelude::*;
 
 pub mod appstate;
+pub mod helpers;
+pub mod shutdown;
+pub mod startup;
 pub mod ui;
 
+use shutdown::generate_lib_info;
 use ui::main::ui_main;
 
 fn main() -> Result<(), anyhow::Error> {
@@ -23,7 +31,11 @@ fn main() -> Result<(), anyhow::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app_state = AppState::build();
+    // TESTING:
+    shutdown::store_books(&generate_lib_info())?;
+
+    let mut app_state = AppState::build()?;
+
     let res = run_app(&mut terminal, &mut app_state);
 
     // Restore terminal on ending:
@@ -62,10 +74,22 @@ fn run_app<B: Backend>(
                 CurrentScreen::Main => match key.code {
                     event::KeyCode::Esc | event::KeyCode::Char('q') => break,
                     event::KeyCode::Char(']') => {
-                        app_state.current_tab.next();
+                        app_state.current_main_tab.next();
                     }
                     event::KeyCode::Char('[') => {
-                        app_state.current_tab.previous();
+                        app_state.current_main_tab.previous();
+                    }
+                    event::KeyCode::Char('}') => {
+                        app_state.library_data.categories.next();
+                    }
+                    event::KeyCode::Char('{') => {
+                        app_state.library_data.categories.previous();
+                    }
+                    event::KeyCode::Up => {
+                        app_state.library_data.get_category_list_mut().previous();
+                    }
+                    event::KeyCode::Down => {
+                        app_state.library_data.get_category_list_mut().next();
                     }
                     _ => (),
                 },
