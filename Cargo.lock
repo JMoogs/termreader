@@ -204,17 +204,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rreader"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "crossterm",
- "ratatui",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "rustversion"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -330,6 +319,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "termreader"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossterm",
+ "ratatui",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

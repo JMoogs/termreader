@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use crate::{
     helpers::{CategoryTabs, StatefulList},
@@ -100,10 +100,11 @@ impl From<LibraryJson> for LibraryData {
 
         value.categories.insert(0, value.default_category_name);
         let categories = CategoryTabs::with_tabs(value.categories);
-        return LibraryData {
+
+        LibraryData {
             books: map,
             categories,
-        };
+        }
     }
 }
 
@@ -221,4 +222,62 @@ pub struct GlobalBookData {
     pub read_chapters: usize,
     pub total_chapters: usize,
     pub unread_downloaded_chapters: usize,
+}
+
+// A book must be split into lines with a maximum width equivalent to the width of the terminal
+// The amount of lines rendered must be the same as the height of the terminal
+// These can change at any time, though it is generally unlikely to happen.
+// Note that lines must be split on spaces.
+
+/// Represents a chapter for a non-local source. Behaviour for a local source is undecided as of current.
+pub struct BookPortion<'a> {
+    /// The entire portion split on whitespace into words.
+    words: Vec<String>,
+    /// A value representing the current width (i.e. the max character length) of the stored lines.
+    current_width: u16,
+    /// A vector of ranges [start, end) of words contained in the line.
+    lines: Vec<(usize, usize)>,
+    /// A value representing the current height that is rendered i.e. `rendered_lines.len()`
+    current_height: u16,
+    /// A vector containing all the lines that should be rendered onto the terminal.
+    rendered_lines: VecDeque<&'a str>,
+}
+
+impl<'a> BookPortion<'a> {
+    fn new(text: String, width: u16, height: u16) -> Self {
+        todo!()
+    }
+}
+
+fn to_words(text: impl AsRef<str>) -> Vec<String> {
+    text.as_ref()
+        .split_whitespace()
+        .map(|x| x.to_string())
+        .collect()
+}
+
+fn to_lines(words: &Vec<String>, width: u16) -> Vec<(usize, usize)> {
+    let max_len = width as usize;
+
+    let mut lines = Vec::new();
+
+    let mut idx = 0;
+
+    let mut line_start = 0;
+    let mut line_len = 0;
+
+    while idx < words.len() {
+        // Using '<' instead of '<=' as we are adding a length of 1 for the space between the words.
+        if line_len + words[idx].len() < max_len {
+            line_len += words[idx].len() + 1;
+        } else {
+            lines.push((line_start, idx));
+            line_start = idx;
+            line_len = 0;
+        }
+
+        idx += 1;
+    }
+
+    lines
 }

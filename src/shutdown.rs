@@ -114,5 +114,5 @@ pub fn generate_lib_info() -> LibraryJson {
 
     let categories: Vec<String> = vec!["Favourites".into(), "Read later".into(), "meh".into()];
 
-    return LibraryJson::new(categories, books);
+    LibraryJson::new(categories, books)
 }

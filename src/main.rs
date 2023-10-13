@@ -68,6 +68,7 @@ fn run_app<B: Backend>(
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Release {
                 // We only care about key presses
+                // Note: This should only matter with windows as other OSes don't have key release events in crossterm
                 continue;
             }
             match app_state.current_screen {
