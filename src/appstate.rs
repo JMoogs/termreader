@@ -232,20 +232,80 @@ pub struct GlobalBookData {
 /// Represents a chapter for a non-local source. Behaviour for a local source is undecided as of current.
 pub struct BookPortion<'a> {
     /// The entire portion split on whitespace into words.
+    // Note: Consider using Rc<str> here?
     words: Vec<String>,
     /// A value representing the current width (i.e. the max character length) of the stored lines.
     current_width: u16,
     /// A vector of ranges [start, end) of words contained in the line.
-    lines: Vec<(usize, usize)>,
+    lines: Option<Vec<(usize, usize)>>,
     /// A value representing the current height that is rendered i.e. `rendered_lines.len()`
     current_height: u16,
+    /// Represents the index of the first line of `lines` that is contained in `rendered_lines`
+    renedered_line_idx: Option<usize>,
     /// A vector containing all the lines that should be rendered onto the terminal.
-    rendered_lines: VecDeque<&'a str>,
+    rendered_lines: Option<VecDeque<&'a str>>,
 }
 
 impl<'a> BookPortion<'a> {
     fn new(text: String, width: u16, height: u16) -> Self {
-        todo!()
+        Self {
+            words: to_words(text),
+            current_width: width,
+            lines: None,
+            current_height: height,
+            renedered_line_idx: None,
+            rendered_lines: None,
+        }
+    }
+
+    fn set_lines(&mut self) {
+        let max_len = self.current_width as usize;
+
+        let mut lines = Vec::new();
+
+        let mut idx = 0;
+        let mut line_start = 0;
+        let mut line_len = 0;
+        let words = &self.words;
+
+        while idx < words.len() {
+            // If the word is longer than the terminal size, just skip the word for now.
+            // Later we can worry about splitting it into smaller words to be displayed.
+            if words[idx].len() > line_len {
+                idx += 1;
+            }
+            // Using '<' instead of '<=' as we are adding a length of 1 for the space between the words.
+            if line_len + words[idx].len() < max_len {
+                line_len += words[idx].len() + 1;
+            } else {
+                lines.push((line_start, idx));
+                line_start = idx;
+                line_len = 0;
+            }
+
+            idx += 1;
+        }
+
+        self.lines = Some(lines);
+    }
+
+    fn set_rendered_lines(&mut self, start_line: usize) {
+        if self.lines.is_none() {
+            return;
+        }
+
+        self.renedered_line_idx = Some(start_line);
+
+        let mut lines = VecDeque::new();
+
+        for i in start_line..(start_line + self.current_height as usize) {
+            let (start_word, end_word) = self.lines.as_ref().unwrap()[i];
+            let str: &'a str = self.words[start_word..end_word].join(" ");
+
+            lines.push_back(str);
+        }
+
+        self.rendered_lines = Some(lines);
     }
 }
 
@@ -256,28 +316,5 @@ fn to_words(text: impl AsRef<str>) -> Vec<String> {
         .collect()
 }
 
-fn to_lines(words: &Vec<String>, width: u16) -> Vec<(usize, usize)> {
-    let max_len = width as usize;
-
-    let mut lines = Vec::new();
-
-    let mut idx = 0;
-
-    let mut line_start = 0;
-    let mut line_len = 0;
-
-    while idx < words.len() {
-        // Using '<' instead of '<=' as we are adding a length of 1 for the space between the words.
-        if line_len + words[idx].len() < max_len {
-            line_len += words[idx].len() + 1;
-        } else {
-            lines.push((line_start, idx));
-            line_start = idx;
-            line_len = 0;
-        }
-
-        idx += 1;
-    }
-
-    lines
-}
+#[cfg(test)]
+mod tests {}
