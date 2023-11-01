@@ -7,18 +7,23 @@ use crossterm::{
     event::{self, Event},
     execute, terminal,
 };
+use logging::initialize_logging;
 use ratatui::prelude::*;
 
 pub mod appstate;
 pub mod helpers;
+pub mod local;
+pub mod logging;
+pub mod reader;
 pub mod shutdown;
 pub mod startup;
 pub mod ui;
 
-use shutdown::generate_lib_info;
-use ui::main::ui_main;
+use ui::{main::ui_main, reader::ui_reader};
 
 fn main() -> Result<(), anyhow::Error> {
+    // Set up logging
+    initialize_logging()?;
     // Set up the terminal
     terminal::enable_raw_mode()?;
     let mut stdout = std::io::stdout();
@@ -32,11 +37,13 @@ fn main() -> Result<(), anyhow::Error> {
     let mut terminal = Terminal::new(backend)?;
 
     // TESTING:
-    shutdown::store_books(&generate_lib_info())?;
+    // shutdown::store_books(&shutdown::generate_lib_info())?;
 
     let mut app_state = AppState::build()?;
 
     let res = run_app(&mut terminal, &mut app_state);
+
+    shutdown::store_books(&app_state.library_data.clone().into())?;
 
     // Restore terminal on ending:
     terminal::disable_raw_mode()?;
@@ -61,10 +68,10 @@ fn run_app<B: Backend>(
     loop {
         match app_state.current_screen {
             CurrentScreen::Main => terminal.draw(|f| ui_main(f, app_state))?,
-            CurrentScreen::Reader => todo!(),
+            CurrentScreen::Reader => terminal.draw(|f| ui_reader(f, app_state))?,
             CurrentScreen::ExitingReader => todo!(),
         };
-        // terminal.draw(|f| ui(f, app_state))?;
+
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Release {
                 // We only care about key presses
@@ -81,20 +88,65 @@ fn run_app<B: Backend>(
                         app_state.current_main_tab.previous();
                     }
                     event::KeyCode::Char('}') => {
-                        app_state.library_data.categories.next();
+                        if app_state.current_main_tab.in_library() {
+                            app_state.library_data.categories.next();
+                        }
                     }
                     event::KeyCode::Char('{') => {
-                        app_state.library_data.categories.previous();
+                        if app_state.current_main_tab.in_library() {
+                            app_state.library_data.categories.previous();
+                        }
                     }
                     event::KeyCode::Up => {
-                        app_state.library_data.get_category_list_mut().previous();
+                        if app_state.current_main_tab.in_library() {
+                            app_state.library_data.get_category_list_mut().previous();
+                        }
                     }
                     event::KeyCode::Down => {
-                        app_state.library_data.get_category_list_mut().next();
+                        if app_state.current_main_tab.in_library() {
+                            app_state.library_data.get_category_list_mut().next();
+                        }
+                    }
+                    event::KeyCode::Enter | event::KeyCode::Char(' ') => {
+                        if app_state.current_main_tab.in_library() {
+                            let idx = app_state
+                                .library_data
+                                .get_category_list()
+                                .state
+                                .selected()
+                                .unwrap();
+                            let book =
+                                app_state.library_data.get_category_list().items[idx].clone();
+
+                            app_state.current_screen = CurrentScreen::Reader;
+                            app_state.update_reader(book)?;
+                        }
                     }
                     _ => (),
                 },
-                CurrentScreen::Reader => {}
+                CurrentScreen::Reader => match key.code {
+                    event::KeyCode::Esc | event::KeyCode::Char('q') => {
+                        app_state.update_lib_from_reader()?;
+                        // shutdown::store_books(&app_state.library_data.clone().into())?;
+                        app_state.current_screen = CurrentScreen::Main;
+                    }
+                    event::KeyCode::Down => {
+                        app_state.reader_data.as_mut().unwrap().scroll_down(1);
+                    }
+                    event::KeyCode::Up => {
+                        app_state.reader_data.as_mut().unwrap().scroll_up(1);
+                    }
+                    event::KeyCode::Right => {
+                        trace_dbg!(app_state
+                            .reader_data
+                            .as_mut()
+                            .unwrap()
+                            .portion
+                            .display_line_idxs
+                            .clone());
+                    }
+                    _ => (),
+                },
                 CurrentScreen::ExitingReader => {}
             }
         }

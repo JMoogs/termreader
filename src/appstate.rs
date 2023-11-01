@@ -1,8 +1,13 @@
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
+use std::time::SystemTime;
 
+use crate::reader::buffer::BookProgressData;
+use crate::reader::ReaderData;
 use crate::{
     helpers::{CategoryTabs, StatefulList},
+    local::LocalBookData,
     startup,
 };
 
@@ -10,6 +15,7 @@ pub struct AppState {
     pub current_screen: CurrentScreen,
     pub current_main_tab: CategoryTabs,
     pub library_data: LibraryData,
+    pub reader_data: Option<ReaderData>,
 }
 
 impl AppState {
@@ -26,17 +32,78 @@ impl AppState {
                 String::from("Settings"),
             ]),
             library_data: LibraryData::from(lib_info),
+            reader_data: None,
         })
+    }
+
+    pub fn update_reader(&mut self, book: LibraryBookInfo) -> Result<(), anyhow::Error> {
+        self.reader_data = Some(ReaderData::create(book)?);
+
+        Ok(())
+    }
+
+    pub fn update_lib_from_reader(&mut self) -> Result<()> {
+        if self.reader_data.is_none() {
+            return Ok(());
+        }
+
+        self.reader_data.as_mut().unwrap().set_progress()?;
+
+        let copy = self.reader_data.as_ref().unwrap().book_info.clone();
+        let id = copy.id;
+
+        let b = self.library_data.find_book_mut(id);
+
+        match b {
+            None => panic!(),
+            Some(book) => {
+                let _ = std::mem::replace(book, copy);
+            }
+        }
+
+        Ok(())
     }
 }
 
+#[derive(Clone)]
 pub struct LibraryData {
     // This string contains the category name, and the stateful list contains all books under the aforementioned category.
     pub books: HashMap<String, StatefulList<LibraryBookInfo>>,
+    pub default_category_name: String,
     pub categories: CategoryTabs,
 }
 
 impl LibraryData {
+    pub fn find_book(&self, id: ID) -> Option<&LibraryBookInfo> {
+        let lists = self.books.values();
+
+        for list in lists {
+            let search = list.items.iter().find(|i| i.id == id);
+            if search.is_none() {
+                continue;
+            }
+            let res = search.unwrap();
+            return Some(res);
+        }
+
+        None
+    }
+
+    pub fn find_book_mut(&mut self, id: ID) -> Option<&mut LibraryBookInfo> {
+        let lists = self.books.values_mut();
+
+        for list in lists {
+            let search = list.items.iter_mut().find(|i| i.id == id);
+            if search.is_none() {
+                continue;
+            }
+            let res = search.unwrap();
+            return Some(res);
+        }
+
+        None
+    }
+
     pub fn get_category_list(&self) -> &StatefulList<LibraryBookInfo> {
         let idx = self.categories.index;
 
@@ -60,6 +127,8 @@ impl From<LibraryJson> for LibraryData {
     fn from(mut value: LibraryJson) -> Self {
         let mut map: HashMap<_, StatefulList<_>> = HashMap::new();
 
+        let default_category_name = value.default_category_name.clone();
+
         // Create all the expected categories in advance
         for category in &value.categories {
             map.insert(category.clone(), StatefulList::new());
@@ -68,7 +137,7 @@ impl From<LibraryJson> for LibraryData {
         for book in value.entries {
             match book.category.clone() {
                 None => {
-                    if let Some(list) = map.get_mut(&value.default_category_name) {
+                    if let Some(list) = map.get_mut(&default_category_name) {
                         list.insert(book);
                     } else {
                         map.insert(
@@ -83,10 +152,8 @@ impl From<LibraryJson> for LibraryData {
                     } else {
                         // If the category doesn't exist, simply put the book in the default category.
                         // TODO: On saving, revert the category to the default one
-                        if map.contains_key(&value.default_category_name) {
-                            map.get_mut(&value.default_category_name)
-                                .unwrap()
-                                .insert(book);
+                        if map.contains_key(&default_category_name) {
+                            map.get_mut(&default_category_name).unwrap().insert(book);
                         } else {
                             map.insert(
                                 value.default_category_name.clone(),
@@ -104,6 +171,7 @@ impl From<LibraryJson> for LibraryData {
         LibraryData {
             books: map,
             categories,
+            default_category_name,
         }
     }
 }
@@ -115,14 +183,22 @@ pub enum CurrentScreen {
     ExitingReader,
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ID {
     id: usize,
 }
 
 impl ID {
-    pub fn new(id: usize) -> Self {
-        Self { id }
+    pub fn generate() -> Self {
+        let now = SystemTime::now();
+
+        let unix_timestamp = now
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Time has gone VERY backwards.");
+
+        Self {
+            id: unix_timestamp.as_millis() as usize,
+        }
     }
 }
 
@@ -151,6 +227,34 @@ impl LibraryJson {
     }
 }
 
+impl From<LibraryData> for LibraryJson {
+    fn from(value: LibraryData) -> Self {
+        let default_category_name = value.default_category_name;
+        let categories = value.categories.tabs;
+
+        // Don't add the default
+        let categories = categories
+            .into_iter()
+            .filter(|v| v != &default_category_name)
+            .collect();
+
+        let entries: Vec<LibraryBookInfo> = value
+            .books
+            .into_values()
+            .map(|v| {
+                let s: Vec<LibraryBookInfo> = v.into();
+                s
+            })
+            .flatten()
+            .collect();
+        Self {
+            default_category_name,
+            categories,
+            entries,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct LibraryBookInfo {
     pub name: String,
@@ -160,22 +264,54 @@ pub struct LibraryBookInfo {
 }
 
 impl LibraryBookInfo {
-    pub fn new(name: String, source_data: BookSource, category: Option<String>, id: ID) -> Self {
+    pub fn is_local(&self) -> bool {
+        matches!(self.source_data, BookSource::Local(_))
+    }
+
+    pub fn from_local(
+        path: impl Into<String>,
+        category: Option<String>,
+    ) -> Result<Self, anyhow::Error> {
+        let data = LocalBookData::create(path)?;
+
+        let source = BookSource::Local(data);
+
+        Ok(Self {
+            name: source.get_name(),
+            source_data: source,
+            category,
+            id: ID::generate(),
+        })
+    }
+
+    pub fn new(source_data: BookSource, category: Option<String>, id: ID) -> Self {
         Self {
-            name,
+            name: source_data.get_name(),
             source_data,
             category,
             id,
         }
     }
 
+    pub fn set_progress(&mut self, progress: BookProgressData) {
+        match &mut self.source_data {
+            BookSource::Local(ref mut data) => {
+                data.progress = progress;
+            }
+            BookSource::Global(data) => {
+                todo!()
+            }
+        }
+    }
+
     pub fn display_info(&self) -> String {
         match self.source_data.clone() {
             BookSource::Local(data) => {
-                let percent_through = 100.0 * data.current_page as f64 / data.total_pages as f64;
+                let prog = data.get_progress_display();
+                // format!("{} | {}", self.name, data.format.get_progress())
                 format!(
-                    "{} | Page: {}/{} ({:.2}%)",
-                    self.name, data.current_page, data.total_pages, percent_through
+                    "{} | Lines: {}/{} ({:.2}%)",
+                    self.name, prog.0, prog.1, prog.2
                 )
             }
             BookSource::Global(data) => {
@@ -207,114 +343,20 @@ pub enum BookSource {
     Global(GlobalBookData),
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct LocalBookData {
-    pub path_to_book: String,
-    pub current_page: usize,
-    pub total_pages: usize,
-    // To verify the book is unchanged
-    pub hash: String,
+impl BookSource {
+    fn get_name(&self) -> String {
+        match self {
+            BookSource::Local(d) => d.name.clone(),
+            BookSource::Global(d) => d.name.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct GlobalBookData {
+    pub name: String,
     pub path_to_book: String,
     pub read_chapters: usize,
     pub total_chapters: usize,
     pub unread_downloaded_chapters: usize,
 }
-
-// A book must be split into lines with a maximum width equivalent to the width of the terminal
-// The amount of lines rendered must be the same as the height of the terminal
-// These can change at any time, though it is generally unlikely to happen.
-// Note that lines must be split on spaces.
-
-/// Represents a chapter for a non-local source. Behaviour for a local source is undecided as of current.
-pub struct BookPortion<'a> {
-    /// The entire portion split on whitespace into words.
-    // Note: Consider using Rc<str> here?
-    words: Vec<String>,
-    /// A value representing the current width (i.e. the max character length) of the stored lines.
-    current_width: u16,
-    /// A vector of ranges [start, end) of words contained in the line.
-    lines: Option<Vec<(usize, usize)>>,
-    /// A value representing the current height that is rendered i.e. `rendered_lines.len()`
-    current_height: u16,
-    /// Represents the index of the first line of `lines` that is contained in `rendered_lines`
-    renedered_line_idx: Option<usize>,
-    /// A vector containing all the lines that should be rendered onto the terminal.
-    rendered_lines: Option<VecDeque<&'a str>>,
-}
-
-impl<'a> BookPortion<'a> {
-    fn new(text: String, width: u16, height: u16) -> Self {
-        Self {
-            words: to_words(text),
-            current_width: width,
-            lines: None,
-            current_height: height,
-            renedered_line_idx: None,
-            rendered_lines: None,
-        }
-    }
-
-    fn set_lines(&mut self) {
-        let max_len = self.current_width as usize;
-
-        let mut lines = Vec::new();
-
-        let mut idx = 0;
-        let mut line_start = 0;
-        let mut line_len = 0;
-        let words = &self.words;
-
-        while idx < words.len() {
-            // If the word is longer than the terminal size, just skip the word for now.
-            // Later we can worry about splitting it into smaller words to be displayed.
-            if words[idx].len() > line_len {
-                idx += 1;
-            }
-            // Using '<' instead of '<=' as we are adding a length of 1 for the space between the words.
-            if line_len + words[idx].len() < max_len {
-                line_len += words[idx].len() + 1;
-            } else {
-                lines.push((line_start, idx));
-                line_start = idx;
-                line_len = 0;
-            }
-
-            idx += 1;
-        }
-
-        self.lines = Some(lines);
-    }
-
-    fn set_rendered_lines(&mut self, start_line: usize) {
-        if self.lines.is_none() {
-            return;
-        }
-
-        self.renedered_line_idx = Some(start_line);
-
-        let mut lines = VecDeque::new();
-
-        for i in start_line..(start_line + self.current_height as usize) {
-            let (start_word, end_word) = self.lines.as_ref().unwrap()[i];
-            let str: &'a str = self.words[start_word..end_word].join(" ");
-
-            lines.push_back(str);
-        }
-
-        self.rendered_lines = Some(lines);
-    }
-}
-
-fn to_words(text: impl AsRef<str>) -> Vec<String> {
-    text.as_ref()
-        .split_whitespace()
-        .map(|x| x.to_string())
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {}

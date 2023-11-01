@@ -6,6 +6,12 @@ pub struct StatefulList<T> {
     pub items: Vec<T>,
 }
 
+impl<T> From<StatefulList<T>> for Vec<T> {
+    fn from(value: StatefulList<T>) -> Self {
+        value.items
+    }
+}
+
 impl<T> Default for StatefulList<T> {
     fn default() -> Self {
         Self::new()
@@ -86,6 +92,7 @@ impl<T> StatefulList<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct CategoryTabs {
     pub tabs: Vec<String>,
     pub index: usize,
@@ -106,5 +113,9 @@ impl CategoryTabs {
         } else {
             self.index = self.tabs.len() - 1;
         }
+    }
+
+    pub fn in_library(&self) -> bool {
+        self.index == 0
     }
 }
