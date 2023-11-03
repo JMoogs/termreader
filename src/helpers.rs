@@ -92,7 +92,7 @@ impl<T> StatefulList<T> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CategoryTabs {
     pub tabs: Vec<String>,
     pub index: usize,

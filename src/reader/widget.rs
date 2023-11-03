@@ -2,8 +2,6 @@ use std::collections::VecDeque;
 
 use ratatui::{prelude::*, widgets::StatefulWidget};
 
-use crate::trace_dbg;
-
 use super::buffer::{BookPortion, DisplayLineIndex, LineReturnData, Linebreaks, NextDisplay};
 
 #[derive(Default, Clone)]

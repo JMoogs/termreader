@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use crate::reader::buffer::BookProgressData;
+use crate::reader::buffer::{BookProgress, BookProgressData};
 use crate::reader::ReaderData;
 use crate::{
     helpers::{CategoryTabs, StatefulList},
@@ -16,14 +16,55 @@ pub struct AppState {
     pub current_main_tab: CategoryTabs,
     pub library_data: LibraryData,
     pub reader_data: Option<ReaderData>,
+    pub reader_menu_options: ReaderMenuOptions,
+    /// A buffer to store any text that may be typed by the user.
+    pub text_buffer: String,
+}
+
+pub struct ReaderMenuOptions {
+    pub local_options: StatefulList<String>,
+    pub global_options: StatefulList<String>,
+    pub category_moves: StatefulList<String>,
+}
+
+impl ReaderMenuOptions {
+    fn new(categories: Vec<String>) -> Self {
+        let local_options = StatefulList::with_items(vec![
+            String::from("Continue reading"),
+            String::from("Move to category..."),
+            String::from("Rename"),
+            String::from("Start from beginning"),
+            String::from("Remove book from library"),
+        ]);
+
+        let global_options = StatefulList::with_items(vec![
+            String::from("Continue reading"),
+            String::from("View chapter list"),
+            String::from("Move to category..."),
+            String::from("Rename"),
+            String::from("Start from beginning"),
+            String::from("Remove book from library"),
+        ]);
+
+        let category_moves = StatefulList::with_items(categories);
+
+        Self {
+            local_options,
+            global_options,
+            category_moves,
+        }
+    }
 }
 
 impl AppState {
     pub fn build() -> Result<Self, anyhow::Error> {
         let lib_info = startup::load_books()?;
+        let library_data = LibraryData::from(lib_info);
+
+        let cats = library_data.categories.tabs.clone();
 
         Ok(Self {
-            current_screen: CurrentScreen::Main,
+            current_screen: CurrentScreen::Main(MenuType::Default),
             current_main_tab: CategoryTabs::with_tabs(vec![
                 String::from("Library"),
                 String::from("Updates"),
@@ -31,12 +72,14 @@ impl AppState {
                 String::from("History"),
                 String::from("Settings"),
             ]),
-            library_data: LibraryData::from(lib_info),
+            library_data,
             reader_data: None,
+            reader_menu_options: ReaderMenuOptions::new(cats),
+            text_buffer: String::new(),
         })
     }
 
-    pub fn update_reader(&mut self, book: LibraryBookInfo) -> Result<(), anyhow::Error> {
+    pub fn update_reader(&mut self, book: BookInfo) -> Result<(), anyhow::Error> {
         self.reader_data = Some(ReaderData::create(book)?);
 
         Ok(())
@@ -68,13 +111,92 @@ impl AppState {
 #[derive(Clone)]
 pub struct LibraryData {
     // This string contains the category name, and the stateful list contains all books under the aforementioned category.
-    pub books: HashMap<String, StatefulList<LibraryBookInfo>>,
+    pub books: HashMap<String, StatefulList<BookInfo>>,
     pub default_category_name: String,
     pub categories: CategoryTabs,
 }
 
 impl LibraryData {
-    pub fn find_book(&self, id: ID) -> Option<&LibraryBookInfo> {
+    // Problem: does not unselect if the book is selected.
+    pub fn move_category(&mut self, id: ID, category_name: Option<String>) {
+        let book = self.find_book(id).unwrap().clone();
+        self.remove_book(id);
+        self.add_book(book, category_name);
+    }
+
+    pub fn create_category(&mut self, name: String) {
+        self.books.insert(name, StatefulList::new());
+    }
+
+    pub fn add_book(&mut self, mut book: BookInfo, category: Option<String>) {
+        let (list, cat_exists) = match category {
+            Some(ref cat) => match self.books.get_mut(cat) {
+                Some(l) => (l, true),
+                None => (
+                    self.books.get_mut(&self.default_category_name).unwrap(),
+                    false,
+                ),
+            },
+            None => (
+                self.books.get_mut(&self.default_category_name).unwrap(),
+                false,
+            ),
+        };
+
+        if cat_exists {
+            book.category = category;
+        } else {
+            book.category = None;
+        }
+        list.items.push(book);
+
+        if list.items.len() == 1 {
+            list.state.select(Some(0));
+        }
+    }
+
+    pub fn remove_book(&mut self, id: ID) {
+        let lists = self.books.values_mut();
+
+        for list in lists {
+            let search = list.items.iter().position(|i| i.id == id);
+            if search.is_none() {
+                continue;
+            }
+
+            let pos = search.unwrap();
+
+            let sel = list.state.selected().unwrap();
+
+            list.items.remove(pos);
+
+            if sel == pos {
+                if list.items.len() > 0 {
+                    list.state.select(Some(0));
+                } else {
+                    list.state.select(None);
+                }
+            }
+        }
+    }
+
+    pub fn rename_book(&mut self, id: ID, new_name: String) {
+        let book = self.find_book_mut(id);
+
+        if book.is_none() {
+            return;
+        }
+
+        let book = book.unwrap();
+        book.name = new_name.clone();
+
+        match &mut book.source_data {
+            BookSource::Local(d) => d.name = new_name,
+            BookSource::Global(d) => d.name = new_name,
+        }
+    }
+
+    pub fn find_book(&self, id: ID) -> Option<&BookInfo> {
         let lists = self.books.values();
 
         for list in lists {
@@ -89,7 +211,7 @@ impl LibraryData {
         None
     }
 
-    pub fn find_book_mut(&mut self, id: ID) -> Option<&mut LibraryBookInfo> {
+    pub fn find_book_mut(&mut self, id: ID) -> Option<&mut BookInfo> {
         let lists = self.books.values_mut();
 
         for list in lists {
@@ -104,22 +226,26 @@ impl LibraryData {
         None
     }
 
-    pub fn get_category_list(&self) -> &StatefulList<LibraryBookInfo> {
+    pub fn get_category_list(&self) -> &StatefulList<BookInfo> {
         let idx = self.categories.index;
 
         let name = &self.categories.tabs[idx];
 
-        // I don't believe this should ever panic, though it needs to be tested
-        return self.books.get(name).unwrap();
+        match self.books.get(name) {
+            Some(books) => return books,
+            None => panic!("This should never happen"),
+        }
     }
 
-    pub fn get_category_list_mut(&mut self) -> &mut StatefulList<LibraryBookInfo> {
+    pub fn get_category_list_mut(&mut self) -> &mut StatefulList<BookInfo> {
         let idx = self.categories.index;
 
         let name = &self.categories.tabs[idx];
 
-        // I don't believe this should ever panic, though it needs to be tested
-        return self.books.get_mut(name).unwrap();
+        match self.books.get_mut(name) {
+            Some(books) => return books,
+            None => panic!("This should never happen"),
+        }
     }
 }
 
@@ -165,6 +291,11 @@ impl From<LibraryJson> for LibraryData {
             }
         }
 
+        // Ensure the default category has an entry, so that other functions always work.
+        if !map.contains_key(&default_category_name) {
+            map.insert(value.default_category_name.clone(), StatefulList::new());
+        }
+
         value.categories.insert(0, value.default_category_name);
         let categories = CategoryTabs::with_tabs(value.categories);
 
@@ -178,17 +309,28 @@ impl From<LibraryJson> for LibraryData {
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum CurrentScreen {
-    Main,
+    Main(MenuType),
     Reader,
-    ExitingReader,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum MenuType {
+    Default,
+    LocalSelected,
+    GlobalSelected,
+    Renaming(u8),
+    MoveCategories,
+}
+
+/// An ID used to uniquely identify a book.
+/// Determined using the current timestamp, resulting in very little risk of collisions.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ID {
-    id: usize,
+    id: u128,
 }
 
 impl ID {
+    /// Generates an ID using system time.
     pub fn generate() -> Self {
         let now = SystemTime::now();
 
@@ -197,20 +339,20 @@ impl ID {
             .expect("Time has gone VERY backwards.");
 
         Self {
-            id: unix_timestamp.as_millis() as usize,
+            id: unix_timestamp.as_nanos(),
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LibraryJson {
     pub default_category_name: String,
     pub categories: Vec<String>,
-    pub entries: Vec<LibraryBookInfo>,
+    pub entries: Vec<BookInfo>,
 }
 
 impl LibraryJson {
-    pub fn new(categories: Vec<String>, entries: Vec<LibraryBookInfo>) -> Self {
+    pub fn new(categories: Vec<String>, entries: Vec<BookInfo>) -> Self {
         Self {
             default_category_name: String::from("Default"),
             categories,
@@ -238,11 +380,11 @@ impl From<LibraryData> for LibraryJson {
             .filter(|v| v != &default_category_name)
             .collect();
 
-        let entries: Vec<LibraryBookInfo> = value
+        let entries: Vec<BookInfo> = value
             .books
             .into_values()
             .map(|v| {
-                let s: Vec<LibraryBookInfo> = v.into();
+                let s: Vec<BookInfo> = v.into();
                 s
             })
             .flatten()
@@ -255,19 +397,26 @@ impl From<LibraryData> for LibraryJson {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct LibraryBookInfo {
+/// Contains info about a book.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BookInfo {
+    /// The name of the book.
     pub name: String,
+    /// Contains information that is unique to the type of source.
     pub source_data: BookSource,
+    /// The category name of which the book is in. None implies that it is in the default category.
     pub category: Option<String>,
+    /// The unique ID of the book.
     pub id: ID,
 }
 
-impl LibraryBookInfo {
+impl BookInfo {
+    /// Determine whether a book has a local source. Returns true when the source is local.
     pub fn is_local(&self) -> bool {
         matches!(self.source_data, BookSource::Local(_))
     }
 
+    /// Creates an instance of `BookInfo` from a path to a local source file.
     pub fn from_local(
         path: impl Into<String>,
         category: Option<String>,
@@ -284,12 +433,24 @@ impl LibraryBookInfo {
         })
     }
 
-    pub fn new(source_data: BookSource, category: Option<String>, id: ID) -> Self {
+    /// Creates an instance of `BookInfo`.
+    pub fn new(source_data: BookSource, category: Option<String>) -> Self {
         Self {
             name: source_data.get_name(),
             source_data,
             category,
-            id,
+            id: ID::generate(),
+        }
+    }
+
+    pub fn update_progress(&mut self, progress: BookProgress) {
+        match &mut self.source_data {
+            BookSource::Local(ref mut data) => {
+                data.progress.progress = progress;
+            }
+            BookSource::Global(_) => {
+                todo!()
+            }
         }
     }
 
@@ -298,7 +459,7 @@ impl LibraryBookInfo {
             BookSource::Local(ref mut data) => {
                 data.progress = progress;
             }
-            BookSource::Global(data) => {
+            BookSource::Global(_) => {
                 todo!()
             }
         }
@@ -317,33 +478,26 @@ impl LibraryBookInfo {
             BookSource::Global(data) => {
                 let percent_through =
                     100.0 * data.read_chapters as f64 / data.total_chapters as f64;
-                if data.unread_downloaded_chapters > 0 {
-                    format!(
-                        "{} | Chapter: {}/{} ({:.2}%) | Downloaded: {}",
-                        self.name,
-                        data.read_chapters,
-                        data.total_chapters,
-                        percent_through,
-                        data.unread_downloaded_chapters
-                    )
-                } else {
-                    format!(
-                        "{} | Chapter: {}/{} ({:.2}%)",
-                        self.name, data.read_chapters, data.total_chapters, percent_through
-                    )
-                }
+                format!(
+                    "{} | Chapter: {}/{} ({:.2}%)",
+                    self.name, data.read_chapters, data.total_chapters, percent_through,
+                )
             }
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+/// The type of source from which a book is provided. The variants each contain related info to the source.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum BookSource {
+    /// A locally sourced book.
     Local(LocalBookData),
+    /// A book that is not sourced on the user's device.
     Global(GlobalBookData),
 }
 
 impl BookSource {
+    /// Get the name of a book from its source.
     fn get_name(&self) -> String {
         match self {
             BookSource::Local(d) => d.name.clone(),
@@ -352,11 +506,17 @@ impl BookSource {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GlobalBookData {
     pub name: String,
     pub path_to_book: String,
     pub read_chapters: usize,
     pub total_chapters: usize,
-    pub unread_downloaded_chapters: usize,
+    pub chapter_progress: HashMap<usize, BookProgressData>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ChapterDownloadData {
+    pub location: String,
+    pub chapter_progress: HashMap<usize, BookProgressData>,
 }

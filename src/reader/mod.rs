@@ -1,5 +1,5 @@
 use crate::{
-    appstate::{BookSource, LibraryBookInfo},
+    appstate::{BookInfo, BookSource},
     reader::buffer::BufferType,
 };
 
@@ -11,7 +11,7 @@ pub mod buffer;
 pub mod widget;
 
 pub struct ReaderData {
-    pub book_info: LibraryBookInfo,
+    pub book_info: BookInfo,
     pub portion: BookPortion,
 }
 
@@ -37,21 +37,20 @@ impl ReaderData {
         matches!(self.book_info.source_data, BookSource::Local(_))
     }
 
-    pub fn create(mut book: LibraryBookInfo) -> Result<Self, anyhow::Error> {
+    pub fn create(mut book: BookInfo) -> Result<Self, anyhow::Error> {
         match &mut book.source_data {
             BookSource::Local(data) => {
                 let line = data.progress.get_line();
 
                 let mut buffer = LocalBuffer::empty(data.path_to_book.clone());
                 buffer.surround_line(line)?;
-                let portion = BookPortion::empty();
 
                 Ok(Self {
                     book_info: book,
                     portion: BookPortion::with_buffer(BufferType::Local(buffer), (line, 0)),
                 })
             }
-            BookSource::Global(data) => {
+            BookSource::Global(_) => {
                 todo!();
             }
         }

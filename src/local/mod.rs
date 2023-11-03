@@ -1,7 +1,5 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 use crate::reader::buffer::BookProgressData;
@@ -28,7 +26,7 @@ impl LocalBookData {
 
         let format = match extension {
             Some(ext) => match ext.to_str().unwrap() {
-                "txt" => Self::create_txt_data(str.clone())?,
+                "txt" => BookType::Txt,
                 _ => BookType::Unknown,
             },
             None => BookType::Unknown,
@@ -42,14 +40,6 @@ impl LocalBookData {
             format,
             progress,
         })
-    }
-
-    fn create_txt_data(path: String) -> Result<BookType, anyhow::Error> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        let count = reader.lines().count();
-
-        Ok(BookType::Txt)
     }
 
     /// Returns the current line, total lines, then the percentage through (in terms of lines)

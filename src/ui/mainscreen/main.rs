@@ -1,7 +1,9 @@
-use crate::appstate::AppState;
+use crate::appstate::{AppState, CurrentScreen, MenuType};
 use ratatui::{prelude::*, widgets::*};
 
-pub fn ui_main<B: Backend>(f: &mut Frame<B>, app_state: &mut AppState) {
+use super::bookoptions::{render_local_selection, render_mv_category_box, render_rename_box};
+
+pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(3), Constraint::Min(1)])
@@ -19,7 +21,7 @@ pub fn ui_main<B: Backend>(f: &mut Frame<B>, app_state: &mut AppState) {
     };
 }
 
-fn render_tabs<B: Backend>(rect: Rect, app_state: &AppState, f: &mut Frame<B>) {
+fn render_tabs(rect: Rect, app_state: &AppState, f: &mut Frame) {
     let unselected_style = Style::default().fg(Color::White);
     let selected_style = Style::default().fg(Color::Green);
 
@@ -44,7 +46,7 @@ fn render_tabs<B: Backend>(rect: Rect, app_state: &AppState, f: &mut Frame<B>) {
     f.render_widget(tabs, rect);
 }
 
-fn render_lib<B: Backend>(rect: Rect, app_state: &mut AppState, f: &mut Frame<B>) {
+fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     let unselected_style = Style::default().fg(Color::White);
     let selected_style = Style::default().fg(Color::Green);
 
@@ -127,13 +129,23 @@ fn render_lib<B: Backend>(rect: Rect, app_state: &mut AppState, f: &mut Frame<B>
             .border_type(BorderType::Rounded),
     );
 
-    f.render_widget(commands, chunks[2])
+    f.render_widget(commands, chunks[2]);
+
+    // Render a centered box on top if in certain menus.
+    if let CurrentScreen::Main(MenuType::LocalSelected) = app_state.current_screen {
+        render_local_selection(rect, app_state, f);
+    } else if let CurrentScreen::Main(MenuType::Renaming(_)) = app_state.current_screen {
+        // let rect = centered_rect(50, 15, chunks[1]);
+        render_rename_box(rect, app_state, f);
+    } else if let CurrentScreen::Main(MenuType::MoveCategories) = app_state.current_screen {
+        render_mv_category_box(chunks[1], app_state, f)
+    }
 }
 
-fn render_updates<B: Backend>(rect: Rect, f: &mut Frame<B>) {}
+fn render_updates(_rect: Rect, _f: &mut Frame) {}
 
-fn render_sources<B: Backend>(rect: Rect, f: &mut Frame<B>) {}
+fn render_sources(_rect: Rect, _f: &mut Frame) {}
 
-fn render_history<B: Backend>(rect: Rect, f: &mut Frame<B>) {}
+fn render_history(_rect: Rect, _f: &mut Frame) {}
 
-fn render_settings<B: Backend>(rect: Rect, f: &mut Frame<B>) {}
+fn render_settings(_rect: Rect, _f: &mut Frame) {}

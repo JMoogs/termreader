@@ -93,7 +93,7 @@ impl LocalBuffer {
             self.buffer = VecDeque::new();
         } else {
             self.buffer_start_line += lines;
-            for i in 0..lines {
+            for _ in 0..lines {
                 self.buffer.pop_front();
             }
         }
@@ -116,7 +116,7 @@ impl LocalBuffer {
             self.buffer = VecDeque::new();
         } else {
             self.buffer_end_line -= lines;
-            for i in 0..lines {
+            for _ in 0..lines {
                 self.buffer.pop_back();
             }
         }
@@ -195,7 +195,6 @@ impl LocalBuffer {
 
     /// Returns true if the buffer's end was increased.
     pub fn shift_down(&mut self) -> Result<bool> {
-        let end_line = self.buffer_end_line;
         self.remove_lines_front(Self::SHIFT_AMOUNT);
 
         self.add_lines_back(Self::SHIFT_AMOUNT)
@@ -394,6 +393,11 @@ pub enum BookProgress {
     Finished,
 }
 
+impl BookProgress {
+    pub const FINISHED: Self = BookProgress::Finished;
+    pub const NONE: Self = BookProgress::Location((0, 0));
+}
+
 impl BookPortion {
     // Returns the current line and character of the display start.
     pub fn get_progress(&self) -> Result<BookProgressData> {
@@ -482,8 +486,6 @@ impl BookPortion {
             }
             return LineReturnData::LineEnd;
         }
-
-        let (end_line, line_progress) = start;
 
         let possible_chars: Vec<char> = full_line.chars().skip(start.1).collect();
         // If the possible chars <= term_width, then we just take the entire line.
