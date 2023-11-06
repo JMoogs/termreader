@@ -44,6 +44,15 @@ pub struct ChapterPreview {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub struct Chapter {
+    pub source: SourceID,
+    pub novel_url: String,
+    pub chapter_url: String,
+    pub chapter_name: String,
+    pub chatper_contents: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct NovelPreview {
     pub source: SourceID,
     pub name: String,

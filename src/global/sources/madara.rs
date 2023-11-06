@@ -1,7 +1,8 @@
-use super::{get_html, ChapterPreview, Novel};
-use crate::global::sources::{NovelPreview, NovelStatus, SortOrder, SourceID};
+use super::{
+    get_html, Chapter, ChapterPreview, Novel, NovelPreview, NovelStatus, SortOrder, SourceID,
+};
 use anyhow::Result;
-use chrono::{Datelike, Local};
+use chrono::Local;
 use html5ever::tree_builder::TreeSink;
 use regex::Regex;
 use reqwest::Method;
@@ -277,8 +278,79 @@ impl MadaraScraper {
         })
     }
 
-    fn parse_chapter(&self, novel_path: String, chapter_path: String) {
-        todo!();
+    fn parse_chapter(&self, novel_path: String, chapter_path: String) -> Result<Chapter> {
+        let url = format!(
+            "{}{}/{}/{}",
+            self.base_url,
+            self.path.clone().unwrap_or_default().chapter,
+            novel_path,
+            chapter_path
+        );
+
+        let mut html = Html::parse_document(&get_html(url)?);
+
+        let mut chapter_name = html
+            .select(&Selector::parse(".text-center").unwrap())
+            .next()
+            .map(|t| t.text().collect::<String>())
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+
+        if chapter_name.is_empty() {
+            chapter_name = html
+                .select(&Selector::parse("#chapter-heading").unwrap())
+                .next()
+                .map(|t| t.text().collect::<String>())
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+        }
+
+        let text_selector_right = Selector::parse(".text-right").unwrap();
+        let text_selector_left = Selector::parse(".text-left").unwrap();
+        let text_selector_content = Selector::parse(".entry-content").unwrap();
+
+        let chapter_text = if html.select(&text_selector_1).next().is_some() {
+            let ids: Vec<_> = html
+                .select(&Selector::parse(".text-right div").unwrap())
+                .map(|x| x.id())
+                .collect();
+            for id in ids {
+                html.remove_from_parent(&id);
+            }
+            html.select(&text_selector_1).next().unwrap().html()
+        } else if html.select(&text_selector_2).next().is_some() {
+            let ids: Vec<_> = html
+                .select(&Selector::parse(".text-left div").unwrap())
+                .map(|x| x.id())
+                .collect();
+            for id in ids {
+                html.remove_from_parent(&id);
+            }
+            html.select(&text_selector_2).next().unwrap().html()
+        } else if html.select(&text_selector_3).next().is_some() {
+            let ids: Vec<_> = html
+                .select(&Selector::parse(".entry-content div").unwrap())
+                .map(|x| x.id())
+                .collect();
+            for id in ids {
+                html.remove_from_parent(&id);
+            }
+            html.select(&text_selector_3).next().unwrap().html()
+        } else {
+            String::from(
+                "No text was found. Check the source - if it has text, the scraper is broken.",
+            )
+        };
+
+        Ok(Chapter {
+            source: self.source_id,
+            novel_url: novel_path,
+            chapter_url: chapter_path,
+            chapter_name,
+            chatper_contents: chapter_text,
+        })
     }
 
     fn search_novels(&self) {
@@ -305,7 +377,6 @@ mod tests {
         println!("{:?}", popular);
     }
 
-        let box
     #[test]
     fn get_chapters() {
         let boxnovel = MadaraScraper::new(
@@ -320,5 +391,22 @@ mod tests {
             .parse_novel_and_chapters("awakening-the-weakest-talent-only-i-level-up".into());
 
         println!("{chaps:?}");
+    }
+
+    #[test]
+    fn parse_chapter() {
+        let boxnovel = MadaraScraper::new(
+            SourceID::new(1),
+            "https://boxnovel.com/".into(),
+            "BoxNovel".into(),
+            None,
+            true,
+        );
+
+        let chap = boxnovel.parse_chapter(
+            "awakening-the-weakest-talent-only-i-level-up".into(),
+            "chapter-1".into(),
+        );
+        println!("{chap:?}");
     }
 }
