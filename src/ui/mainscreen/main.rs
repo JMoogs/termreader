@@ -177,7 +177,11 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         .highlight_style(SELECTED_STYLE)
         .highlight_symbol("> ");
 
-    f.render_stateful_widget(sources, chunks[0], app_state.source_data.get_state_mut());
+    if let CurrentScreen::Main(MenuType::SearchResults) = app_state.current_screen {
+        render_search_results(chunks[0], app_state, f, "Results");
+    } else {
+        f.render_stateful_widget(sources, chunks[0], app_state.source_data.get_state_mut());
+    }
 
     let commands = Paragraph::new("Quit: Esc/q | Scroll categories: {/} | Scroll entries: Up/Down")
         .block(
