@@ -152,17 +152,6 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
 
     // Chapters
 
-    let unselected_block = Block::default()
-        .borders(Borders::ALL)
-        .title("Chapters")
-        .border_type(BorderType::Rounded);
-
-    let selected_block = Block::default()
-        .borders(Borders::ALL)
-        .title("Chapters")
-        .border_type(BorderType::Rounded)
-        .style(SELECTED_STYLE);
-
     let chapters = app_state
         .source_data
         .current_novel
@@ -174,6 +163,19 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
         .into_iter()
         .map(|i| ListItem::new(format!("{}: {}", i.chapter_no, i.name)).style(UNSELECTED_STYLE))
         .collect();
+
+    let ch_count = list.len();
+
+    let unselected_block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!("Chapters ({} total)", ch_count))
+        .border_type(BorderType::Rounded);
+
+    let selected_block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!("Chapters ({} total)", ch_count))
+        .border_type(BorderType::Rounded)
+        .style(SELECTED_STYLE);
 
     let display = if app_state.source_data.current_book_ui_option == SourceBookBox::Chapters {
         List::new(list)
