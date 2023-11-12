@@ -50,10 +50,40 @@ impl SourceData {
         );
         let novel_translate: Box<dyn Scrape> = Box::new(novel_translate);
 
+        let lunar_letters = MadaraScraper::new(
+            SourceID::new(4),
+            "https://lunarletters.com/".into(),
+            "LunarLetters".into(),
+            Some(MadaraPaths::new("series", "series", "series")),
+            true,
+        );
+        let lunar_letters: Box<dyn Scrape> = Box::new(lunar_letters);
+
+        let sleepy_translations = MadaraScraper::new(
+            SourceID::new(5),
+            "https://sleepytranslations.com/".into(),
+            "SleepyTranslations".into(),
+            Some(MadaraPaths::new("series", "series", "series")),
+            true,
+        );
+        let sleepy_translations: Box<dyn Scrape> = Box::new(sleepy_translations);
+
+        let free_novel_me = MadaraScraper::new(
+            SourceID::new(6),
+            "https://freenovel.me/".into(),
+            "FreeNovelMe".into(),
+            None,
+            false,
+        );
+        let free_novel_me: Box<dyn Scrape> = Box::new(free_novel_me);
+
         let v = vec![
             (String::from("BoxNovel"), box_novel),
             (String::from("ZinnNovel"), zinn_novel),
             (String::from("NovelTranslate"), novel_translate),
+            (String::from("LunarLetters"), lunar_letters),
+            (String::from("SleepyTranslations"), sleepy_translations),
+            (String::from("FreeNovelMe"), free_novel_me),
         ];
 
         let mut sources = StatefulList::with_items(v);
