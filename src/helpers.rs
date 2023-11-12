@@ -26,6 +26,14 @@ impl<T> StatefulList<T> {
         }
     }
 
+    pub fn selected(&self) -> Option<&T> {
+        let idx = self.state.selected();
+        match idx {
+            Some(i) => Some(&self.items[i]),
+            None => None,
+        }
+    }
+
     pub fn with_item(item: T) -> StatefulList<T> {
         Self {
             state: ListState::default().with_selected(Some(0)),
@@ -117,5 +125,21 @@ impl CategoryTabs {
 
     pub fn in_library(&self) -> bool {
         self.index == 0
+    }
+
+    pub fn in_updates(&self) -> bool {
+        self.index == 1
+    }
+
+    pub fn in_sources(&self) -> bool {
+        self.index == 2
+    }
+
+    pub fn in_history(&self) -> bool {
+        self.index == 3
+    }
+
+    pub fn in_settings(&self) -> bool {
+        self.index == 4
     }
 }

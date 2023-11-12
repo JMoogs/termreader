@@ -6,6 +6,7 @@ use std::time::SystemTime;
 use crate::reader::buffer::{BookProgress, BookProgressData};
 use crate::reader::ReaderData;
 use crate::{
+    global::sources::{source_data::SourceData, Novel},
     helpers::{CategoryTabs, StatefulList},
     local::LocalBookData,
     startup,
@@ -16,18 +17,21 @@ pub struct AppState {
     pub current_main_tab: CategoryTabs,
     pub library_data: LibraryData,
     pub reader_data: Option<ReaderData>,
-    pub reader_menu_options: ReaderMenuOptions,
+    pub menu_options: MenuOptions,
+    pub source_data: SourceData,
     /// A buffer to store any text that may be typed by the user.
     pub text_buffer: String,
 }
 
-pub struct ReaderMenuOptions {
+pub struct MenuOptions {
     pub local_options: StatefulList<String>,
     pub global_options: StatefulList<String>,
     pub category_moves: StatefulList<String>,
+    pub source_options: StatefulList<String>,
+    pub source_book_options: StatefulList<String>,
 }
 
-impl ReaderMenuOptions {
+impl MenuOptions {
     fn new(categories: Vec<String>) -> Self {
         let local_options = StatefulList::with_items(vec![
             String::from("Continue reading"),
@@ -48,10 +52,21 @@ impl ReaderMenuOptions {
 
         let category_moves = StatefulList::with_items(categories);
 
+        let source_options =
+            StatefulList::with_items(vec![String::from("Search"), String::from("View popular")]);
+
+        let source_book_options = StatefulList::with_items(vec![
+            String::from("Start from beginning"),
+            String::from("Add book to library"),
+            // String::from("View chapters"),
+        ]);
+
         Self {
             local_options,
             global_options,
             category_moves,
+            source_options,
+            source_book_options,
         }
     }
 }
@@ -74,25 +89,48 @@ impl AppState {
             ]),
             library_data,
             reader_data: None,
-            reader_menu_options: ReaderMenuOptions::new(cats),
+            menu_options: MenuOptions::new(cats),
+            source_data: SourceData::build(),
             text_buffer: String::new(),
         })
     }
 
-    pub fn update_reader(&mut self, book: BookInfo) -> Result<(), anyhow::Error> {
-        self.reader_data = Some(ReaderData::create(book)?);
+    pub fn move_to_reader(
+        &mut self,
+        mut book: BookInfo,
+        chapter: Option<usize>,
+    ) -> Result<(), anyhow::Error> {
+        self.current_screen = CurrentScreen::Reader;
+        match book.get_source_data() {
+            BookSource::Local(_) => {
+                self.reader_data = Some(ReaderData::create(book, chapter, None)?)
+            }
+            BookSource::Global(_) => {
+                let source = &self.source_data.sources.selected().unwrap().1;
+                self.reader_data = Some(ReaderData::create(book, chapter, Some(source))?)
+            }
+        }
 
         Ok(())
     }
 
     pub fn update_lib_from_reader(&mut self) -> Result<()> {
-        if self.reader_data.is_none() {
+        let reader_data = if self.reader_data.is_none() {
             return Ok(());
-        }
+        } else {
+            self.reader_data.as_mut().unwrap()
+        };
 
-        self.reader_data.as_mut().unwrap().set_progress()?;
+        reader_data.set_progress()?;
 
-        let copy = self.reader_data.as_ref().unwrap().book_info.clone();
+        // self.reader_data.as_mut().unwrap().set_progress()?;
+
+        let reader_data = match &reader_data.book_info {
+            BookInfo::Library(d) => d,
+            BookInfo::Reader(_) => return Ok(()),
+        };
+
+        let copy = reader_data.clone();
         let id = copy.id;
 
         let b = self.library_data.find_book_mut(id);
@@ -106,12 +144,18 @@ impl AppState {
 
         Ok(())
     }
+
+    pub fn reset_selections(&mut self) {
+        self.menu_options.global_options.state.select(Some(0));
+        self.menu_options.local_options.state.select(Some(0));
+        self.menu_options.source_options.state.select(Some(0));
+    }
 }
 
 #[derive(Clone)]
 pub struct LibraryData {
     // This string contains the category name, and the stateful list contains all books under the aforementioned category.
-    pub books: HashMap<String, StatefulList<BookInfo>>,
+    pub books: HashMap<String, StatefulList<LibBookInfo>>,
     pub default_category_name: String,
     pub categories: CategoryTabs,
 }
@@ -128,7 +172,7 @@ impl LibraryData {
         self.books.insert(name, StatefulList::new());
     }
 
-    pub fn add_book(&mut self, mut book: BookInfo, category: Option<String>) {
+    pub fn add_book(&mut self, mut book: LibBookInfo, category: Option<String>) {
         let (list, cat_exists) = match category {
             Some(ref cat) => match self.books.get_mut(cat) {
                 Some(l) => (l, true),
@@ -196,7 +240,7 @@ impl LibraryData {
         }
     }
 
-    pub fn find_book(&self, id: ID) -> Option<&BookInfo> {
+    pub fn find_book(&self, id: ID) -> Option<&LibBookInfo> {
         let lists = self.books.values();
 
         for list in lists {
@@ -211,7 +255,7 @@ impl LibraryData {
         None
     }
 
-    pub fn find_book_mut(&mut self, id: ID) -> Option<&mut BookInfo> {
+    pub fn find_book_mut(&mut self, id: ID) -> Option<&mut LibBookInfo> {
         let lists = self.books.values_mut();
 
         for list in lists {
@@ -226,7 +270,7 @@ impl LibraryData {
         None
     }
 
-    pub fn get_category_list(&self) -> &StatefulList<BookInfo> {
+    pub fn get_category_list(&self) -> &StatefulList<LibBookInfo> {
         let idx = self.categories.index;
 
         let name = &self.categories.tabs[idx];
@@ -237,7 +281,7 @@ impl LibraryData {
         }
     }
 
-    pub fn get_category_list_mut(&mut self) -> &mut StatefulList<BookInfo> {
+    pub fn get_category_list_mut(&mut self) -> &mut StatefulList<LibBookInfo> {
         let idx = self.categories.index;
 
         let name = &self.categories.tabs[idx];
@@ -316,10 +360,25 @@ pub enum CurrentScreen {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum MenuType {
     Default,
-    LocalSelected,
-    GlobalSelected,
-    Renaming(u8),
+    Select(SelectBox),
+    Typing(TypingOptions),
+    SearchResults,
+    SourceBookView,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum SelectBox {
+    Local,
+    Global,
     MoveCategories,
+    Source,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum TypingOptions {
+    RenamingLocal,
+    RenamingGlobal,
+    Searching,
 }
 
 /// An ID used to uniquely identify a book.
@@ -348,11 +407,11 @@ impl ID {
 pub struct LibraryJson {
     pub default_category_name: String,
     pub categories: Vec<String>,
-    pub entries: Vec<BookInfo>,
+    pub entries: Vec<LibBookInfo>,
 }
 
 impl LibraryJson {
-    pub fn new(categories: Vec<String>, entries: Vec<BookInfo>) -> Self {
+    pub fn new(categories: Vec<String>, entries: Vec<LibBookInfo>) -> Self {
         Self {
             default_category_name: String::from("Default"),
             categories,
@@ -380,11 +439,11 @@ impl From<LibraryData> for LibraryJson {
             .filter(|v| v != &default_category_name)
             .collect();
 
-        let entries: Vec<BookInfo> = value
+        let entries: Vec<LibBookInfo> = value
             .books
             .into_values()
             .map(|v| {
-                let s: Vec<BookInfo> = v.into();
+                let s: Vec<LibBookInfo> = v.into();
                 s
             })
             .flatten()
@@ -397,9 +456,114 @@ impl From<LibraryData> for LibraryJson {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum BookInfo {
+    Library(LibBookInfo),
+    Reader(ReaderBookInfo),
+}
+
+impl BookInfo {
+    /// Creates an instance of `BookInfo` from a `Novel`
+    pub fn from_novel_temp(novel: Novel) -> Result<Self, anyhow::Error> {
+        let name = novel.name.clone();
+        let source = BookSource::Global(GlobalBookData::create(novel));
+
+        Ok(BookInfo::Reader(ReaderBookInfo {
+            name,
+            source_data: source,
+        }))
+    }
+    // pub fn get_progress(&self, chapter: Option<usize>) -> BookProgress {
+    //     match self {
+    //         BookInfo::Library(d) => match d.source_data {
+    //             BookSource::Local(d) => d.progress.progress,
+    //             BookSource::Global(d) => {
+    //                 let entry = d.chapter_progress.get(&chapter.unwrap());
+    //                 match entry {
+    //                     None => return BookProgress::NONE,
+    //                     Some(progress) => return progress.progress,
+    //                 }
+    //             }
+    //         },
+    //         BookInfo::Reader(d) => match d.source_data {
+    //             BookSource::Local(d) => d.progress.progress,
+    //             BookSource::Global(d) => {
+    //                 let entry = d.chapter_progress.get(&chapter.unwrap());
+    //                 match entry {
+    //                     None => return BookProgress::NONE,
+    //                     Some(progress) => return progress.progress,
+    //                 }
+    //             }
+    //         },
+    //     }
+    // }
+
+    pub fn is_local(&self) -> bool {
+        match self {
+            BookInfo::Library(d) => matches!(d.source_data, BookSource::Local(_)),
+            BookInfo::Reader(d) => matches!(d.source_data, BookSource::Local(_)),
+        }
+    }
+
+    pub fn get_source_data(&mut self) -> &mut BookSource {
+        match self {
+            BookInfo::Library(d) => &mut d.source_data,
+            BookInfo::Reader(d) => &mut d.source_data,
+        }
+    }
+
+    pub fn update_progress(&mut self, progress: BookProgress, chapter: Option<usize>) {
+        match self {
+            BookInfo::Library(d) => match d.source_data {
+                BookSource::Local(ref mut data) => data.progress.progress = progress,
+                BookSource::Global(ref mut data) => {
+                    let c = chapter.unwrap();
+                    let entry = data.chapter_progress.get_mut(&c).unwrap();
+                    entry.progress = progress;
+                }
+            },
+            BookInfo::Reader(d) => match d.source_data {
+                BookSource::Local(ref mut data) => {
+                    data.progress.progress = progress;
+                }
+                BookSource::Global(ref mut data) => {
+                    let c = chapter.unwrap();
+                    let entry = data.chapter_progress.get_mut(&c).unwrap();
+                    entry.progress = progress;
+                }
+            },
+        }
+    }
+
+    pub fn set_progress(&mut self, progress: BookProgressData, chapter: Option<usize>) {
+        match self {
+            BookInfo::Library(d) => match d.source_data {
+                BookSource::Local(ref mut data) => data.progress = progress,
+                BookSource::Global(ref mut data) => {
+                    data.chapter_progress.insert(chapter.unwrap(), progress);
+                }
+            },
+            BookInfo::Reader(d) => match d.source_data {
+                BookSource::Local(ref mut data) => {
+                    data.progress = progress;
+                }
+                BookSource::Global(ref mut data) => {
+                    data.chapter_progress.insert(chapter.unwrap(), progress);
+                }
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReaderBookInfo {
+    pub name: String,
+    pub source_data: BookSource,
+}
+
 /// Contains info about a book.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct BookInfo {
+pub struct LibBookInfo {
     /// The name of the book.
     pub name: String,
     /// Contains information that is unique to the type of source.
@@ -410,7 +574,7 @@ pub struct BookInfo {
     pub id: ID,
 }
 
-impl BookInfo {
+impl LibBookInfo {
     /// Determine whether a book has a local source. Returns true when the source is local.
     pub fn is_local(&self) -> bool {
         matches!(self.source_data, BookSource::Local(_))
@@ -509,10 +673,22 @@ impl BookSource {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GlobalBookData {
     pub name: String,
-    pub path_to_book: String,
     pub read_chapters: usize,
     pub total_chapters: usize,
     pub chapter_progress: HashMap<usize, BookProgressData>,
+    pub novel: Novel,
+}
+
+impl GlobalBookData {
+    pub fn create(novel: Novel) -> Self {
+        Self {
+            name: novel.name.clone(),
+            read_chapters: 0,
+            total_chapters: novel.chapters.len(),
+            chapter_progress: HashMap::new(),
+            novel,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -18,6 +18,9 @@ pub mod ui;
 
 use ui::{controls::handle_controls, mainscreen::main::ui_main, reader::ui_reader};
 
+const UNSELECTED_STYLE: ratatui::style::Style = Style::new().fg(Color::White);
+const SELECTED_STYLE: ratatui::style::Style = Style::new().fg(Color::Green);
+
 fn main() -> Result<(), anyhow::Error> {
     // Set up logging
     initialize_logging()?;

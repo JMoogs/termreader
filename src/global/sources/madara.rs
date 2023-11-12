@@ -1,28 +1,59 @@
 use super::{
-    get_html, Chapter, ChapterPreview, Novel, NovelPreview, NovelStatus, SortOrder, SourceID,
+    get_html, Chapter, ChapterPreview, Novel, NovelPreview, NovelStatus, Scrape, SortOrder,
+    SourceID,
 };
 use anyhow::Result;
 use chrono::Local;
 use html5ever::tree_builder::TreeSink;
 use regex::Regex;
-use reqwest::Method;
 use scraper::{Html, Selector};
 // https://github.com/LNReader/lnreader/blob/main/src/sources/multisrc/madara/MadaraScraper.js
 
-struct MadaraScraper {
+pub struct MadaraScraper {
     source_id: SourceID,
     base_url: String,
-    // page: String,
     source_name: String,
     path: Option<MadaraPaths>,
     new_chap_endpoint: bool,
 }
 
+impl Scrape for MadaraScraper {
+    fn get_popular(&self, sort_order: SortOrder, page: usize) -> Result<Vec<NovelPreview>> {
+        self.get_popular(sort_order, page)
+    }
+
+    fn parse_novel_and_chapters(&self, novel_path: String) -> Result<Novel> {
+        self.parse_novel_and_chapters(novel_path)
+    }
+
+    fn parse_chapter(&self, novel_path: String, chapter_path: String) -> Result<Chapter> {
+        self.parse_chapter(novel_path, chapter_path)
+    }
+
+    fn search_novels(&self, search_term: &str) -> Result<Vec<NovelPreview>> {
+        self.search_novels(search_term)
+    }
+}
+
 #[derive(Clone)]
-struct MadaraPaths {
+pub struct MadaraPaths {
     novels: String,
     novel: String,
     chapter: String,
+}
+
+impl MadaraPaths {
+    pub fn new(
+        novels: impl Into<String>,
+        novel: impl Into<String>,
+        chapter: impl Into<String>,
+    ) -> Self {
+        Self {
+            novels: novels.into(),
+            novel: novel.into(),
+            chapter: chapter.into(),
+        }
+    }
 }
 
 impl Default for MadaraPaths {
@@ -36,7 +67,7 @@ impl Default for MadaraPaths {
 }
 
 impl MadaraScraper {
-    fn new(
+    pub fn new(
         source_id: SourceID,
         base_url: String,
         source_name: String,
@@ -184,10 +215,33 @@ impl MadaraScraper {
         let client = reqwest::blocking::Client::new();
         let response = if self.new_chap_endpoint {
             let url = reqwest::Url::parse(&format!("{}{}", url, "ajax/chapters/")).unwrap();
-            let req = reqwest::blocking::Request::new(Method::POST, url);
-            client.execute(req)?.text()?
+            client.post(url).send()?.text()?
         } else {
-            todo!()
+            let selector_1 = Selector::parse(".rating-post-id").unwrap();
+            let selector_2 = Selector::parse("#manga-chapters-holder").unwrap();
+
+            let mut novel_id = html
+                .select(&selector_1)
+                .next()
+                .and_then(|element| element.value().attr("value"))
+                .unwrap_or_default();
+
+            if novel_id.is_empty() {
+                novel_id = html
+                    .select(&selector_2)
+                    .next()
+                    .and_then(|element| element.value().attr("data-id"))
+                    .unwrap_or_default()
+            }
+
+            let url =
+                reqwest::Url::parse(&format!("{}{}", url, "wp-admin/admin-ajax.php")).unwrap();
+
+            let form = reqwest::blocking::multipart::Form::new()
+                .text("action", "manga_get_chapters")
+                .text("manga", novel_id.to_string());
+
+            client.post(url).multipart(form).send()?.text()?
         };
 
         let html = Html::parse_document(&response);
@@ -202,6 +256,11 @@ impl MadaraScraper {
                 .unwrap()
                 .trim()
                 .to_string();
+            let chapter_name = if chapter_name.is_empty() {
+                String::from("[No Name Provided]")
+            } else {
+                chapter_name
+            };
 
             let mut release_date = html
                 .select(&Selector::parse("span.chapter-release-date").unwrap())
@@ -257,11 +316,19 @@ impl MadaraScraper {
                 panic!("Scraper outdated")
             };
 
-            chapters.push(ChapterPreview {
-                release_date,
-                name: chapter_name,
-                url: chapter_url,
-            });
+            chapters.push((release_date, chapter_name, chapter_url));
+        }
+
+        let chapters = chapters.into_iter().rev();
+        let mut c = Vec::new();
+        for (i, chapter) in chapters.enumerate() {
+            let preview = ChapterPreview {
+                chapter_no: i + 1,
+                release_date: chapter.0,
+                name: chapter.1,
+                url: chapter.2,
+            };
+            c.push(preview);
         }
 
         Ok(Novel {
@@ -274,7 +341,7 @@ impl MadaraScraper {
             status,
             genres,
             summary,
-            chapters,
+            chapters: c,
         })
     }
 
@@ -287,7 +354,7 @@ impl MadaraScraper {
             chapter_path
         );
 
-        let mut html = Html::parse_document(&get_html(url)?);
+        let html = Html::parse_document(&get_html(url)?);
 
         let mut chapter_name = html
             .select(&Selector::parse(".text-center").unwrap())
@@ -311,33 +378,28 @@ impl MadaraScraper {
         let text_selector_left = Selector::parse(".text-left").unwrap();
         let text_selector_content = Selector::parse(".entry-content").unwrap();
 
-        let chapter_text = if html.select(&text_selector_1).next().is_some() {
-            let ids: Vec<_> = html
-                .select(&Selector::parse(".text-right div").unwrap())
-                .map(|x| x.id())
-                .collect();
-            for id in ids {
-                html.remove_from_parent(&id);
+        let chapter_text = if html.select(&text_selector_left).next().is_some() {
+            let mut text = String::new();
+            for line in html.select(&Selector::parse(".text-left p").unwrap()) {
+                text.push('\n');
+                text.push('\n');
+                text.push_str(line.text().collect::<String>().trim());
             }
-            html.select(&text_selector_1).next().unwrap().html()
-        } else if html.select(&text_selector_2).next().is_some() {
-            let ids: Vec<_> = html
-                .select(&Selector::parse(".text-left div").unwrap())
-                .map(|x| x.id())
-                .collect();
-            for id in ids {
-                html.remove_from_parent(&id);
+            text.trim().to_string()
+        } else if html.select(&text_selector_right).next().is_some() {
+            let mut text = String::new();
+            for line in html.select(&Selector::parse(".text-right p").unwrap()) {
+                text.push('\n');
+                text.push_str(line.text().collect::<String>().trim());
             }
-            html.select(&text_selector_2).next().unwrap().html()
-        } else if html.select(&text_selector_3).next().is_some() {
-            let ids: Vec<_> = html
-                .select(&Selector::parse(".entry-content div").unwrap())
-                .map(|x| x.id())
-                .collect();
-            for id in ids {
-                html.remove_from_parent(&id);
+            text.trim().to_string()
+        } else if html.select(&text_selector_content).next().is_some() {
+            let mut text = String::new();
+            for line in html.select(&Selector::parse(".entry-content p").unwrap()) {
+                text.push('\n');
+                text.push_str(line.text().collect::<String>().trim());
             }
-            html.select(&text_selector_3).next().unwrap().html()
+            text.trim().to_string()
         } else {
             String::from(
                 "No text was found. Check the source - if it has text, the scraper is broken.",
@@ -349,12 +411,46 @@ impl MadaraScraper {
             novel_url: novel_path,
             chapter_url: chapter_path,
             chapter_name,
-            chatper_contents: chapter_text,
+            chapter_contents: chapter_text,
         })
     }
 
-    fn search_novels(&self) {
-        todo!();
+    fn search_novels(&self, search_term: &str) -> Result<Vec<NovelPreview>> {
+        let url = format!("{}?s={}&post_type=wp-manga", self.base_url, search_term);
+        let html = Html::parse_document(&get_html(url)?);
+
+        let mut novels = Vec::new();
+
+        let selector = Selector::parse(".c-tabs-item__content").unwrap();
+
+        for selection in html.select(&selector) {
+            let name_selector = Selector::parse(".post-title").unwrap();
+            let name = selection
+                .select(&name_selector)
+                .next()
+                .map(|t| t.text().collect::<String>())
+                .unwrap()
+                .trim()
+                .to_string();
+            let novel_url = selection
+                .select(&name_selector)
+                .next()
+                .and_then(|t| t.select(&Selector::parse("a").unwrap()).next())
+                .and_then(|a| a.value().attr("href"));
+            let novel_url = if let Some(n_url) = novel_url {
+                n_url.split('/').collect::<Vec<&str>>()[4].to_string()
+            } else {
+                panic!("Scraper outdated");
+            };
+
+            novels.push(NovelPreview {
+                source: self.source_id,
+                name,
+                url: novel_url,
+            })
+        }
+
+        Ok(novels)
     }
 }
 
@@ -405,8 +501,22 @@ mod tests {
 
         let chap = boxnovel.parse_chapter(
             "awakening-the-weakest-talent-only-i-level-up".into(),
-            "chapter-1".into(),
+            "chapter-964".into(),
         );
         println!("{chap:?}");
+    }
+
+    #[test]
+    fn search_novel() {
+        let boxnovel = MadaraScraper::new(
+            SourceID::new(1),
+            "https://boxnovel.com/".into(),
+            "BoxNovel".into(),
+            None,
+            true,
+        );
+
+        let s = boxnovel.search_novels("awakening");
+        println!("{s:?}");
     }
 }

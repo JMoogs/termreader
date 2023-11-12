@@ -1,12 +1,11 @@
 use ratatui::{prelude::*, widgets::*};
 
-use crate::{appstate::AppState, ui::helpers::centered_sized_rect};
+use crate::{
+    appstate::AppState, ui::helpers::centered_sized_rect, SELECTED_STYLE, UNSELECTED_STYLE,
+};
 
 pub fn render_local_selection(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
-    let unselected_style = Style::default().fg(Color::White);
-    let selected_style = Style::default().fg(Color::Green);
-
-    let options = app_state.reader_menu_options.local_options.items.clone();
+    let options = app_state.menu_options.local_options.items.clone();
 
     let mut max_width = 0;
     for s in options.iter() {
@@ -19,7 +18,7 @@ pub fn render_local_selection(rect: Rect, app_state: &mut AppState, f: &mut Fram
 
     let list: Vec<ListItem> = options
         .into_iter()
-        .map(|i| ListItem::new(i).style(unselected_style))
+        .map(|i| ListItem::new(i).style(UNSELECTED_STYLE))
         .collect();
 
     let height = list.len() + 2;
@@ -31,22 +30,15 @@ pub fn render_local_selection(rect: Rect, app_state: &mut AppState, f: &mut Fram
                 .title("Options")
                 .border_type(BorderType::Rounded),
         )
-        .highlight_style(selected_style)
+        .highlight_style(SELECTED_STYLE)
         .highlight_symbol("> ");
 
     let r = centered_sized_rect(max_width as u16, height as u16, rect);
-    f.render_stateful_widget(
-        display,
-        r,
-        &mut app_state.reader_menu_options.local_options.state,
-    )
+    f.render_stateful_widget(display, r, &mut app_state.menu_options.local_options.state)
 }
 
 pub fn render_global_selection(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
-    let unselected_style = Style::default().fg(Color::White);
-    let selected_style = Style::default().fg(Color::Green);
-
-    let options = app_state.reader_menu_options.global_options.items.clone();
+    let options = app_state.menu_options.global_options.items.clone();
 
     let mut max_width = 0;
     for s in options.iter() {
@@ -59,7 +51,7 @@ pub fn render_global_selection(rect: Rect, app_state: &mut AppState, f: &mut Fra
 
     let list: Vec<ListItem> = options
         .into_iter()
-        .map(|i| ListItem::new(i).style(unselected_style))
+        .map(|i| ListItem::new(i).style(UNSELECTED_STYLE))
         .collect();
 
     let height = list.len() + 2;
@@ -71,18 +63,14 @@ pub fn render_global_selection(rect: Rect, app_state: &mut AppState, f: &mut Fra
                 .title("Options")
                 .border_type(BorderType::Rounded),
         )
-        .highlight_style(selected_style)
+        .highlight_style(SELECTED_STYLE)
         .highlight_symbol("> ");
 
     let r = centered_sized_rect(max_width as u16, height as u16, rect);
-    f.render_stateful_widget(
-        display,
-        r,
-        &mut app_state.reader_menu_options.global_options.state,
-    )
+    f.render_stateful_widget(display, r, &mut app_state.menu_options.global_options.state)
 }
 
-pub fn render_rename_box(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
+pub fn render_type_box(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     let mut text = app_state.text_buffer.clone();
     text.push('_');
 
@@ -90,7 +78,7 @@ pub fn render_rename_box(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("New name:")
+                .title("Input Text:")
                 .border_type(BorderType::Rounded),
         )
         .wrap(Wrap { trim: false });
@@ -101,9 +89,6 @@ pub fn render_rename_box(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
 }
 
 pub fn render_mv_category_box(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
-    let unselected_style = Style::default().fg(Color::White);
-    let selected_style = Style::default().fg(Color::Green);
-
     let options = app_state.library_data.categories.tabs.clone();
 
     let mut max_width = 0;
@@ -117,7 +102,7 @@ pub fn render_mv_category_box(rect: Rect, app_state: &mut AppState, f: &mut Fram
 
     let list: Vec<ListItem> = options
         .into_iter()
-        .map(|i| ListItem::new(i).style(unselected_style))
+        .map(|i| ListItem::new(i).style(UNSELECTED_STYLE))
         .collect();
 
     let height = list.len() + 2; // + 2 to add the box
@@ -129,14 +114,10 @@ pub fn render_mv_category_box(rect: Rect, app_state: &mut AppState, f: &mut Fram
                 .title("Categories")
                 .border_type(BorderType::Rounded),
         )
-        .highlight_style(selected_style)
+        .highlight_style(SELECTED_STYLE)
         .highlight_symbol("> ");
 
     let r = centered_sized_rect(max_width as u16, height as u16, rect);
     // let r = centered_rect(20, 20, rect);
-    f.render_stateful_widget(
-        display,
-        r,
-        &mut app_state.reader_menu_options.category_moves.state,
-    )
+    f.render_stateful_widget(display, r, &mut app_state.menu_options.category_moves.state)
 }
