@@ -1,5 +1,5 @@
 use crate::{
-    appstate::{AppState, CurrentScreen, MenuType, SelectBox, TypingOptions},
+    appstate::{AppState, CurrentScreen, LibraryOptions, SourceOptions},
     ui::mainscreen::bookoptions::{
         render_local_selection, render_mv_category_box, render_type_box,
     },
@@ -13,7 +13,7 @@ use super::sourceoptions::{render_search_results, render_source_book};
 pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
     if matches!(
         app_state.current_screen,
-        CurrentScreen::Main(MenuType::SourceBookView)
+        CurrentScreen::Sources(SourceOptions::BookView)
     ) {
         render_source_book(f, app_state);
         return;
@@ -141,11 +141,11 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     f.render_widget(commands, chunks[2]);
 
     // Render a centered box on top if in certain menus.
-    if let CurrentScreen::Main(MenuType::Select(SelectBox::Local)) = app_state.current_screen {
+    if let CurrentScreen::Library(LibraryOptions::LocalBookSelect) = app_state.current_screen {
         render_local_selection(rect, app_state, f);
-    } else if let CurrentScreen::Main(MenuType::Typing(_)) = app_state.current_screen {
+    } else if let CurrentScreen::Typing = app_state.current_screen {
         render_type_box(rect, app_state, f);
-    } else if let CurrentScreen::Main(MenuType::Select(SelectBox::MoveCategories)) =
+    } else if let CurrentScreen::Library(LibraryOptions::MoveCategorySelect) =
         app_state.current_screen
     {
         render_mv_category_box(chunks[1], app_state, f)
@@ -177,7 +177,7 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         .highlight_style(SELECTED_STYLE)
         .highlight_symbol("> ");
 
-    if let CurrentScreen::Main(MenuType::SearchResults) = app_state.current_screen {
+    if let CurrentScreen::Sources(SourceOptions::SearchResults) = app_state.current_screen {
         render_search_results(chunks[0], app_state, f, "Results");
     } else {
         f.render_stateful_widget(sources, chunks[0], app_state.source_data.get_state_mut());
@@ -192,15 +192,13 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
 
     f.render_widget(commands, chunks[1]);
 
-    if let CurrentScreen::Main(MenuType::Select(SelectBox::Source)) = app_state.current_screen {
+    if let CurrentScreen::Sources(SourceOptions::SourceSelect) = app_state.current_screen {
         render_source_selection(rect, app_state, f);
-    } else if let CurrentScreen::Main(MenuType::Typing(TypingOptions::Searching)) =
-        app_state.current_screen
-    {
+    } else if let CurrentScreen::Typing = app_state.current_screen {
         render_type_box(rect, app_state, f)
     }
 
-    if let CurrentScreen::Main(MenuType::SearchResults) = app_state.current_screen {
+    if let CurrentScreen::Sources(SourceOptions::SearchResults) = app_state.current_screen {
         render_search_results(chunks[0], app_state, f, "Results");
     }
 }

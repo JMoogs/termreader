@@ -14,6 +14,8 @@ use crate::{
 
 pub struct AppState {
     pub current_screen: CurrentScreen,
+    /// Stores a list of all the previously accessed screens - the implementation of the back button.
+    pub prev_screens: Vec<CurrentScreen>,
     pub current_main_tab: CategoryTabs,
     pub library_data: LibraryData,
     pub reader_data: Option<ReaderData>,
@@ -72,6 +74,22 @@ impl MenuOptions {
 }
 
 impl AppState {
+    pub fn get_last_screen(&self) -> CurrentScreen {
+        return self.prev_screens.last().unwrap().clone();
+    }
+
+    pub fn update_screen(&mut self, new: CurrentScreen) {
+        if self.current_screen.on_main_menu() {
+            self.prev_screens = Vec::new();
+        }
+        if new.on_main_menu() {
+            self.prev_screens = Vec::new();
+        } else {
+            self.prev_screens.push(self.current_screen);
+        }
+        self.current_screen = new;
+    }
+
     pub fn build() -> Result<Self, anyhow::Error> {
         let lib_info = startup::load_books()?;
         let library_data = LibraryData::from(lib_info);
@@ -79,7 +97,8 @@ impl AppState {
         let cats = library_data.categories.tabs.clone();
 
         Ok(Self {
-            current_screen: CurrentScreen::Main(MenuType::Default),
+            current_screen: CurrentScreen::Library(LibraryOptions::Default),
+            prev_screens: Vec::new(),
             current_main_tab: CategoryTabs::with_tabs(vec![
                 String::from("Library"),
                 String::from("Updates"),
@@ -100,7 +119,7 @@ impl AppState {
         mut book: BookInfo,
         chapter: Option<usize>,
     ) -> Result<(), anyhow::Error> {
-        self.current_screen = CurrentScreen::Reader;
+        self.update_screen(CurrentScreen::Reader);
         match book.get_source_data() {
             BookSource::Local(_) => {
                 self.reader_data = Some(ReaderData::create(book, chapter, None)?)
@@ -353,33 +372,88 @@ impl From<LibraryJson> for LibraryData {
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum CurrentScreen {
-    Main(MenuType),
+    // Main(MenuType),
+    Library(LibraryOptions),
+    Updates(UpdateOptions),
+    Sources(SourceOptions),
+    History(HistoryOptions),
+    Settings(SettingsOptions),
     Reader,
+    Typing,
+}
+
+impl CurrentScreen {
+    pub fn in_reader(&self) -> bool {
+        matches!(self, CurrentScreen::Reader)
+    }
+    pub fn on_main_menu(&self) -> bool {
+        match self {
+            CurrentScreen::Library(LibraryOptions::Default)
+            | CurrentScreen::Sources(SourceOptions::Default) => return true,
+
+            _ => false,
+        }
+    }
+
+    pub fn on_library_menu(&self) -> bool {
+        matches!(self, CurrentScreen::Library(LibraryOptions::Default))
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum MenuType {
+pub enum LibraryOptions {
     Default,
-    Select(SelectBox),
-    Typing(TypingOptions),
+    LocalBookSelect,
+    GlobalBookSelect,
+    MoveCategorySelect,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum UpdateOptions {
+    Default,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum SourceOptions {
+    Default,
+    SourceSelect,
     SearchResults,
-    SourceBookView,
+    BookView,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum SelectBox {
-    Local,
-    Global,
-    MoveCategories,
-    Source,
+pub enum HistoryOptions {
+    Default,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum TypingOptions {
-    RenamingLocal,
-    RenamingGlobal,
-    Searching,
+pub enum SettingsOptions {
+    Default,
 }
+
+// #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+// pub enum MenuType {
+//     Default,
+//     Select(SelectBox),
+//     Typing(TypingOptions),
+//     SearchResults,
+//     SourceBookView,
+// }
+
+// #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+// pub enum SelectBox {
+//     Local,
+//     Global,
+//     MoveCategories,
+//     Source,
+// }
+
+// #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+// pub enum TypingOptions {
+//     RenamingLocal,
+//     RenamingGlobal,
+//     Searching,
+// }
 
 /// An ID used to uniquely identify a book.
 /// Determined using the current timestamp, resulting in very little risk of collisions.

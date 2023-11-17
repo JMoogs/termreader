@@ -67,8 +67,8 @@ fn run_app<B: Backend>(
 ) -> Result<(), anyhow::Error> {
     loop {
         match app_state.current_screen {
-            CurrentScreen::Main(_) => terminal.draw(|f| ui_main(f, app_state))?,
             CurrentScreen::Reader => terminal.draw(|f| ui_reader(f, app_state))?,
+            _ => terminal.draw(|f| ui_main(f, app_state))?,
         };
 
         if let Event::Key(key) = event::read()? {
@@ -77,8 +77,7 @@ fn run_app<B: Backend>(
                 // Note: This should only matter with windows as other OSes don't have key release events in crossterm
                 continue;
             }
-            let break_check = handle_controls(app_state, key.code)?;
-            if break_check {
+            if handle_controls(app_state, key.code)? {
                 break;
             }
         }
