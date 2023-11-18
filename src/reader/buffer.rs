@@ -7,8 +7,6 @@ use std::{
     io::BufReader,
 };
 
-use crate::trace_dbg;
-
 #[derive(Debug)]
 pub enum BufferType {
     Local(LocalBuffer),
@@ -547,6 +545,9 @@ impl BookPortion {
 
     /// Returns None when the line does not exist in the buffer
     pub fn get_line_backwards(&mut self, end: (usize, usize)) -> Result<LineReturnData> {
+        if end.1 == 0 {
+            return Ok(LineReturnData::LineEnd);
+        }
         let idx = end.0;
         let line_exists = match &mut self.buffer {
             BufferType::Global(lines) => lines.len() > idx,
@@ -571,6 +572,9 @@ impl BookPortion {
     }
 
     pub fn get_line_backwards_unchecked(&mut self, mut end: (usize, usize)) -> LineReturnData {
+        if end.1 == 0 {
+            return LineReturnData::LineEnd;
+        }
         let idx = end.0;
         let full_line = match &self.buffer {
             BufferType::Global(lines) => lines[idx].clone(),
@@ -589,21 +593,6 @@ impl BookPortion {
         // Adjust to be in the valid range - large values correspond to the end of the line.
         if end.1 > last_char_idx {
             end.1 = last_char_idx;
-        }
-
-        // This probably isn't a special case tbh, and is just left as an artefact of wrong code.
-        // Should be checked later.
-        if end.1 == 0 {
-            trace_dbg!("end.1 == 0 here");
-            trace_dbg!(last_char_idx);
-            return LineReturnData::BackwardsLineExists {
-                line: LineData {
-                    line: full_line,
-                    line_no: end.0,
-                    line_char: 0,
-                },
-                last_char_idx,
-            };
         }
 
         let (line, shortened) = match self.breaks.get_previous_break(end) {

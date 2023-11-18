@@ -102,14 +102,26 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
 
     f.render_widget(title, chunks_vert_1[0]);
 
+    let unselected_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .style(UNSELECTED_STYLE);
+    let selected_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .style(SELECTED_STYLE);
     // Synopsis
-    let synopsis = Paragraph::new(novel.synopsis())
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded),
-        )
-        .wrap(Wrap { trim: true });
+    let synopsis = if app_state.source_data.current_book_ui_option == SourceBookBox::Summary {
+        Paragraph::new(novel.synopsis())
+            .block(selected_block)
+            .wrap(Wrap { trim: true })
+            .scroll((app_state.source_data.current_novel_scroll as u16, 0))
+    } else {
+        Paragraph::new(novel.synopsis())
+            .block(unselected_block)
+            .wrap(Wrap { trim: true })
+            .scroll((app_state.source_data.current_novel_scroll as u16, 0))
+    };
 
     f.render_widget(synopsis, chunks_horiz[0]);
 

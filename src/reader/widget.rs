@@ -2,6 +2,8 @@ use std::collections::VecDeque;
 
 use ratatui::{prelude::*, widgets::StatefulWidget};
 
+use crate::trace_dbg;
+
 use super::buffer::{BookPortion, DisplayLineIndex, LineReturnData, Linebreaks, NextDisplay};
 
 #[derive(Default, Clone)]
@@ -266,9 +268,12 @@ impl BookText {
 
         // If we hit eof, it's possible that more lines should be renedered before the first line.
         if eof {
+            trace_dbg!(display_lines.clone());
             let mut line_end = portion.display_start;
+            trace_dbg!(line_end);
             loop {
                 let prev_line = portion.get_line_backwards(line_end)?;
+                trace_dbg!(prev_line.clone());
                 match prev_line {
                     LineReturnData::NonExistent => break,
                     LineReturnData::LineEnd => {

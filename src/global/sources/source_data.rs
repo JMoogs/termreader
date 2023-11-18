@@ -11,6 +11,7 @@ pub struct SourceData {
     pub sources: StatefulSourceList,
     pub novel_results: StatefulList<NovelPreview>,
     pub current_novel: Option<Novel>,
+    pub current_novel_scroll: usize,
     pub current_novel_chaps: StatefulList<ChapterPreview>,
     pub current_book_ui_option: SourceBookBox,
 }
@@ -19,6 +20,7 @@ pub struct SourceData {
 pub enum SourceBookBox {
     Options,
     Chapters,
+    Summary,
 }
 
 impl SourceData {
@@ -93,6 +95,7 @@ impl SourceData {
             sources,
             novel_results: StatefulList::new(),
             current_novel: None,
+            current_novel_scroll: 0,
             current_novel_chaps: StatefulList::new(),
             current_book_ui_option: SourceBookBox::Options,
         }

@@ -8,7 +8,10 @@ use crate::{
 };
 use ratatui::{prelude::*, widgets::*};
 
-use super::sourceoptions::{render_search_results, render_source_book};
+use super::{
+    bookoptions::{render_global_selection, render_lib_ch_list},
+    sourceoptions::{render_search_results, render_source_book},
+};
 
 pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
     if matches!(
@@ -16,6 +19,13 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
         CurrentScreen::Sources(SourceOptions::BookView)
     ) {
         render_source_book(f, app_state);
+        return;
+    }
+    if matches!(
+        app_state.current_screen,
+        CurrentScreen::Library(LibraryOptions::ChapterView)
+    ) {
+        render_lib_ch_list(app_state, f);
         return;
     }
 
@@ -143,6 +153,10 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     // Render a centered box on top if in certain menus.
     if let CurrentScreen::Library(LibraryOptions::LocalBookSelect) = app_state.current_screen {
         render_local_selection(rect, app_state, f);
+    } else if let CurrentScreen::Library(LibraryOptions::GlobalBookSelect) =
+        app_state.current_screen
+    {
+        render_global_selection(rect, app_state, f);
     } else if let CurrentScreen::Typing = app_state.current_screen {
         render_type_box(rect, app_state, f);
     } else if let CurrentScreen::Library(LibraryOptions::MoveCategorySelect) =

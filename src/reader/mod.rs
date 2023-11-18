@@ -4,7 +4,7 @@ use crate::{
     reader::buffer::BufferType,
 };
 
-use self::buffer::{BookPortion, BookProgressData, LocalBuffer, NextDisplay};
+use self::buffer::{BookPortion, BookProgress, BookProgressData, LocalBuffer, NextDisplay};
 
 use anyhow::Result;
 
@@ -23,32 +23,19 @@ impl ReaderData {
     }
 
     pub fn set_progress(&mut self) -> Result<()> {
-        // match self.book_info {
-        //     BookInfo::Library(info) => {
-        //         // if info.is_local() {
-        //         //     self.book_info.set_progress(self.get_progress()?, None)
-        //         // } else {
-        //         //     let ch = self.book_info.
-        //         // }
-        //         match info.source_data {
-        //             BookSource::Local(_) => self.book_info.set_progress(self.get_progress()?, None),
-        //             BookSource::Global(_) => self
-        //                 .book_info
-        //                 .set_progress(self.get_progress()?, Some(self.global_chapter)),
-        //         }
-        //     }
-        //     BookInfo::Reader(info) => match info.source_data {
-        //         BookSource::Local(_) => self.book_info.set_progress(self.get_progress()?, None),
-        //         BookSource::Global(_) => self
-        //             .book_info
-        //             .set_progress(self.get_progress()?, Some(self.global_chapter)),
-        //     },
-        // }
         if self.is_local_source() {
             self.book_info.set_progress(self.get_progress()?, None)
         } else {
-            self.book_info
-                .set_progress(self.get_progress()?, Some(self.global_chapter))
+            let prog = self.get_progress()?;
+            if prog.progress == BookProgress::FINISHED {
+                match self.book_info.get_source_data_mut() {
+                    BookSource::Local(_) => unreachable!(),
+                    BookSource::Global(d) => {
+                        d.read_chapters.insert(self.global_chapter);
+                    }
+                }
+            }
+            self.book_info.set_progress(prog, Some(self.global_chapter))
         }
         Ok(())
     }
@@ -70,7 +57,7 @@ impl ReaderData {
         chapter: Option<usize>,
         source: Option<&Box<dyn Scrape>>,
     ) -> Result<Self, anyhow::Error> {
-        match book.get_source_data() {
+        match book.get_source_data_mut() {
             BookSource::Local(data) => {
                 let line = data.progress.get_line();
 

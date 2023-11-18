@@ -139,7 +139,7 @@ impl MadaraScraper {
     }
 
     fn parse_novel_and_chapters(&self, novel_path: String) -> Result<Novel> {
-        let url = &self.path.clone().unwrap_or_default().novels;
+        let url = &self.path.clone().unwrap_or_default().novel;
         let url = format!("{}{}/{}/", self.base_url, url, novel_path);
 
         let mut html = Html::parse_document(&get_html(&url)?);

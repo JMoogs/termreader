@@ -2,6 +2,7 @@ use crate::{
     appstate::AppState,
     reader::{buffer::NextDisplay, widget::BookText},
 };
+use chrono::Local;
 use ratatui::{prelude::*, widgets::*};
 
 pub fn ui_reader(f: &mut Frame, app_state: &mut AppState) {
@@ -28,4 +29,40 @@ fn render_reader(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     data.portion.display_next = NextDisplay::NoOp;
 }
 
-fn render_bottom(_rect: Rect, _app_state: &AppState, _f: &mut Frame) {}
+fn render_bottom(rect: Rect, app_state: &AppState, f: &mut Frame) {
+    let book = &app_state.reader_data.as_ref().unwrap().book_info;
+
+    let title = book.get_source_data().get_name();
+
+    let progress_pct = app_state
+        .reader_data
+        .as_ref()
+        .unwrap()
+        .get_progress()
+        .unwrap()
+        .get_pct();
+
+    let time = Local::now().time();
+    let time = time.format("%H:%M").to_string();
+
+    let display = if book.is_local() {
+        format!("{} | {:.2}% | {}", title, progress_pct, time)
+    } else {
+        let ch = app_state
+            .reader_data
+            .as_ref()
+            .unwrap()
+            .book_info
+            .get_source_data()
+            .get_chapter();
+        format!("{}, Ch {} | {:.2}% | {}", title, ch, progress_pct, time)
+    };
+
+    let text = Paragraph::new(display).block(
+        Block::new()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded),
+    );
+
+    f.render_widget(text, rect)
+}
