@@ -186,14 +186,16 @@ fn control_back(app_state: &mut AppState) -> Result<bool> {
     if app_state.prev_screens.is_empty() {
         return Ok(true);
     }
-    let prev = app_state.prev_screens.pop().unwrap();
+    let mut prev = app_state.prev_screens.pop().unwrap();
     if prev == CurrentScreen::Typing {
         if app_state.prev_screens.is_empty() {
             return Ok(true);
+        } else {
+            prev = app_state.prev_screens.pop().unwrap();
         }
     }
 
-    app_state.current_screen = app_state.prev_screens.pop().unwrap();
+    app_state.current_screen = prev;
     return Ok(false);
 }
 
@@ -210,6 +212,7 @@ fn control_arrows(app_state: &mut AppState, event: event::KeyCode) {
                     4 => {
                         app_state.current_screen = CurrentScreen::Settings(SettingsOptions::Default)
                     }
+
                     _ => unreachable!(),
                 };
             }
