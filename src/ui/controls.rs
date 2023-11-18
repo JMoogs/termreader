@@ -63,6 +63,29 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
             todo!()
         }
         KeyCode::Enter => {
+            match app_state.get_last_screen() {
+                CurrentScreen::Library(LibraryOptions::LocalBookSelect)
+                | CurrentScreen::Library(LibraryOptions::GlobalBookSelect) => {
+                    let book = app_state
+                        .library_data
+                        .get_category_list()
+                        .selected()
+                        .unwrap()
+                        .clone();
+                    app_state
+                        .library_data
+                        .rename_book(book.id, app_state.text_buffer.clone());
+                    app_state.to_lib_screen();
+                }
+                CurrentScreen::Sources(SourceOptions::SourceSelect) => {
+                    let source = &app_state.source_data.get_list().selected().unwrap().1;
+                    let res = source.search_novels(&app_state.text_buffer)?;
+                    app_state.source_data.novel_results = StatefulList::with_items(res);
+                    app_state.update_screen(CurrentScreen::Sources(SourceOptions::SearchResults));
+                }
+                _ => unreachable!(),
+            }
+            app_state.text_buffer = String::new();
             // match app_state.current_screen {
             //     CurrentScreen::Main(MenuType::Typing(TypingOptions::RenamingLocal))
             //     | CurrentScreen::Main(MenuType::Typing(TypingOptions::RenamingGlobal)) => {
@@ -86,7 +109,6 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
             //     _ => unreachable!(),
             // }
             // app_state.text_buffer = String::new();
-            todo!()
         }
         _ => (),
     })
@@ -105,10 +127,21 @@ fn control_bracket(app_state: &mut AppState, event: event::KeyCode) {
                     4 => {
                         app_state.current_screen = CurrentScreen::Settings(SettingsOptions::Default)
                     }
+                    _ => unreachable!(),
                 };
             }
             KeyCode::Char('[') => {
                 app_state.current_main_tab.previous();
+                match app_state.current_main_tab.index {
+                    0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
+                    1 => app_state.current_screen = CurrentScreen::Updates(UpdateOptions::Default),
+                    2 => app_state.current_screen = CurrentScreen::Sources(SourceOptions::Default),
+                    3 => app_state.current_screen = CurrentScreen::History(HistoryOptions::Default),
+                    4 => {
+                        app_state.current_screen = CurrentScreen::Settings(SettingsOptions::Default)
+                    }
+                    _ => unreachable!(),
+                };
             }
             _ => (),
         }
@@ -150,29 +183,16 @@ fn control_bracket(app_state: &mut AppState, event: event::KeyCode) {
 }
 
 fn control_back(app_state: &mut AppState) -> Result<bool> {
-    // match app_state.current_screen {
-    //     CurrentScreen::Main(menu) => match menu {
-    //         MenuType::Default => return Ok(true),
-    //         MenuType::Select(_) => {
-    //             app_state.reset_selections();
-    //             app_state.current_screen = CurrentScreen::Main(MenuType::Default);
-    //         }
-    //         MenuType::SearchResults => {
-    //             app_state.current_screen = CurrentScreen::Main(MenuType::Default);
-    //         }
-    //         MenuType::SourceBookView => {
-    //             app_state.current_screen = CurrentScreen::Main(MenuType::SearchResults)
-    //         }
-    //         _ => (),
-    //     },
-    //     CurrentScreen::Reader => {
-    //         app_state.update_lib_from_reader()?;
-    //         app_state.current_screen = CurrentScreen::Main(MenuType::Default);
-    //     }
-    // }
-    if app_state.prev_screens.len() == 0 {
+    if app_state.prev_screens.is_empty() {
         return Ok(true);
     }
+    let prev = app_state.prev_screens.pop().unwrap();
+    if prev == CurrentScreen::Typing {
+        if app_state.prev_screens.is_empty() {
+            return Ok(true);
+        }
+    }
+
     app_state.current_screen = app_state.prev_screens.pop().unwrap();
     return Ok(false);
 }
@@ -182,9 +202,29 @@ fn control_arrows(app_state: &mut AppState, event: event::KeyCode) {
         match event {
             KeyCode::Right => {
                 app_state.current_main_tab.next();
+                match app_state.current_main_tab.index {
+                    0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
+                    1 => app_state.current_screen = CurrentScreen::Updates(UpdateOptions::Default),
+                    2 => app_state.current_screen = CurrentScreen::Sources(SourceOptions::Default),
+                    3 => app_state.current_screen = CurrentScreen::History(HistoryOptions::Default),
+                    4 => {
+                        app_state.current_screen = CurrentScreen::Settings(SettingsOptions::Default)
+                    }
+                    _ => unreachable!(),
+                };
             }
             KeyCode::Left => {
                 app_state.current_main_tab.previous();
+                match app_state.current_main_tab.index {
+                    0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
+                    1 => app_state.current_screen = CurrentScreen::Updates(UpdateOptions::Default),
+                    2 => app_state.current_screen = CurrentScreen::Sources(SourceOptions::Default),
+                    3 => app_state.current_screen = CurrentScreen::History(HistoryOptions::Default),
+                    4 => {
+                        app_state.current_screen = CurrentScreen::Settings(SettingsOptions::Default)
+                    }
+                    _ => unreachable!(),
+                };
             }
             _ => (),
         }
@@ -316,7 +356,7 @@ fn control_enter(app_state: &mut AppState) -> Result<()> {
                     4 => {
                         // Remove from library
                         app_state.library_data.remove_book(book.id);
-                        app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default);
+                        app_state.to_lib_screen();
                     }
                     _ => unreachable!(),
                 }
@@ -342,7 +382,7 @@ fn control_enter(app_state: &mut AppState) -> Result<()> {
 
                 app_state.library_data.move_category(book, Some(category));
 
-                app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default);
+                app_state.to_lib_screen();
             }
         },
         CurrentScreen::Sources(source_options) => match source_options {

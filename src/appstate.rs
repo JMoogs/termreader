@@ -90,6 +90,16 @@ impl AppState {
         self.current_screen = new;
     }
 
+    pub fn to_lib_screen(&mut self) {
+        self.prev_screens = Vec::new();
+        self.current_screen = CurrentScreen::Library(LibraryOptions::Default);
+    }
+
+    pub fn to_source_screen(&mut self) {
+        self.prev_screens = Vec::new();
+        self.current_screen = CurrentScreen::Sources(SourceOptions::Default);
+    }
+
     pub fn build() -> Result<Self, anyhow::Error> {
         let lib_info = startup::load_books()?;
         let library_data = LibraryData::from(lib_info);
@@ -389,7 +399,10 @@ impl CurrentScreen {
     pub fn on_main_menu(&self) -> bool {
         match self {
             CurrentScreen::Library(LibraryOptions::Default)
-            | CurrentScreen::Sources(SourceOptions::Default) => return true,
+            | CurrentScreen::Sources(SourceOptions::Default)
+            | CurrentScreen::Updates(UpdateOptions::Default)
+            | CurrentScreen::History(HistoryOptions::Default)
+            | CurrentScreen::Settings(SettingsOptions::Default) => return true,
 
             _ => false,
         }
@@ -430,30 +443,6 @@ pub enum HistoryOptions {
 pub enum SettingsOptions {
     Default,
 }
-
-// #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-// pub enum MenuType {
-//     Default,
-//     Select(SelectBox),
-//     Typing(TypingOptions),
-//     SearchResults,
-//     SourceBookView,
-// }
-
-// #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-// pub enum SelectBox {
-//     Local,
-//     Global,
-//     MoveCategories,
-//     Source,
-// }
-
-// #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-// pub enum TypingOptions {
-//     RenamingLocal,
-//     RenamingGlobal,
-//     Searching,
-// }
 
 /// An ID used to uniquely identify a book.
 /// Determined using the current timestamp, resulting in very little risk of collisions.
