@@ -20,7 +20,7 @@ pub fn handle_controls(app_state: &mut AppState, event: event::KeyCode) -> Resul
     match event {
         event::KeyCode::Esc | event::KeyCode::Char('q') => return control_back(app_state),
         KeyCode::Left | KeyCode::Right | KeyCode::Down | KeyCode::Up => {
-            control_arrows(app_state, event)
+            control_arrows(app_state, event)?;
         }
         KeyCode::Enter | KeyCode::Char(' ') => {
             control_enter(app_state)?;
@@ -189,7 +189,7 @@ fn control_back(app_state: &mut AppState) -> Result<bool> {
     return Ok(false);
 }
 
-fn control_arrows(app_state: &mut AppState, event: event::KeyCode) {
+fn control_arrows(app_state: &mut AppState, event: event::KeyCode) -> Result<()> {
     if app_state.current_screen.on_main_menu() {
         match event {
             KeyCode::Right => {
@@ -324,10 +324,43 @@ fn control_arrows(app_state: &mut AppState, event: event::KeyCode) {
             KeyCode::Down => {
                 app_state.reader_data.as_mut().unwrap().scroll_down(1);
             }
+            KeyCode::Right => {
+                let ch = app_state
+                    .reader_data
+                    .as_ref()
+                    .unwrap()
+                    .book_info
+                    .get_source_data()
+                    .get_next_chapter();
+
+                if let Some(c) = ch {
+                    let mut book = app_state.reader_data.as_ref().unwrap().book_info.clone();
+
+                    book.get_source_data_mut().set_chapter(c);
+                    app_state.move_to_reader(book, Some(c))?;
+                }
+            }
+            KeyCode::Left => {
+                let ch = app_state
+                    .reader_data
+                    .as_ref()
+                    .unwrap()
+                    .book_info
+                    .get_source_data()
+                    .get_prev_chapter();
+
+                if let Some(c) = ch {
+                    let mut book = app_state.reader_data.as_ref().unwrap().book_info.clone();
+
+                    book.get_source_data_mut().set_chapter(c);
+                    app_state.move_to_reader(book, Some(c))?;
+                }
+            }
             _ => (),
         },
         _ => (),
     }
+    Ok(())
 }
 
 fn control_enter(app_state: &mut AppState) -> Result<()> {
@@ -491,7 +524,10 @@ fn control_enter(app_state: &mut AppState) -> Result<()> {
                         .get_category_list()
                         .selected()
                         .unwrap();
-                    app_state.move_to_reader(BookInfo::Library(novel.clone()), Some(chap + 1))?;
+
+                    let mut novel = novel.clone();
+                    novel.source_data.set_chapter(chap + 1);
+                    app_state.move_to_reader(BookInfo::Library(novel), Some(chap + 1))?;
                 }
             }
         },
@@ -571,10 +607,9 @@ fn control_enter(app_state: &mut AppState) -> Result<()> {
                             .selected()
                             .unwrap();
                         let novel = app_state.source_data.current_novel.clone().unwrap();
-                        app_state.move_to_reader(
-                            BookInfo::from_novel_temp(novel)?,
-                            Some(chap.chapter_no),
-                        )?;
+                        let mut info = BookInfo::from_novel_temp(novel)?;
+                        info.get_source_data_mut().set_chapter(chap.chapter_no);
+                        app_state.move_to_reader(info, Some(chap.chapter_no))?;
                     }
                     SourceBookBox::Summary => (),
                 }

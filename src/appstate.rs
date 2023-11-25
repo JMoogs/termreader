@@ -80,6 +80,9 @@ impl AppState {
     }
 
     pub fn update_screen(&mut self, new: CurrentScreen) {
+        if self.current_screen.in_reader() && new == CurrentScreen::Reader {
+            return;
+        }
         if self.current_screen.on_main_menu() {
             self.prev_screens = Vec::new();
         }
@@ -748,6 +751,33 @@ impl BookSource {
         match self {
             BookSource::Local(_) => return 0,
             BookSource::Global(d) => return d.current_chapter,
+        }
+    }
+
+    pub fn get_next_chapter(&self) -> Option<usize> {
+        match self {
+            BookSource::Local(_) => return None,
+            BookSource::Global(d) => {
+                let next = d.current_chapter + 1;
+                if next <= d.total_chapters {
+                    Some(next)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    pub fn get_prev_chapter(&self) -> Option<usize> {
+        match self {
+            BookSource::Local(_) => return None,
+            BookSource::Global(d) => {
+                if d.current_chapter <= 1 {
+                    return None;
+                } else {
+                    return Some(d.current_chapter - 1);
+                }
+            }
         }
     }
 
