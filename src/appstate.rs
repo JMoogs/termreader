@@ -1,9 +1,10 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::sync::mpsc::{Receiver, Sender};
 use std::time::SystemTime;
 
-use crate::global::sources::ChapterPreview;
+use crate::global::sources::{ChapterPreview, NovelPreview};
 use crate::reader::buffer::{BookProgress, BookProgressData};
 use crate::reader::ReaderData;
 use crate::{
@@ -24,6 +25,28 @@ pub struct AppState {
     pub source_data: SourceData,
     /// A buffer to store any text that may be typed by the user.
     pub text_buffer: String,
+    pub channels: ChannelData,
+}
+
+pub struct ChannelData {
+    pub sender: Sender<RequestData>,
+    pub reciever: Receiver<RequestData>,
+    pub loading: bool,
+}
+
+impl ChannelData {
+    fn new() -> Self {
+        let (sender, reciever) = std::sync::mpsc::channel();
+        Self {
+            sender,
+            reciever,
+            loading: false,
+        }
+    }
+}
+
+pub enum RequestData {
+    SearchResults(Result<Vec<NovelPreview>>),
 }
 
 pub struct MenuOptions {
@@ -125,6 +148,7 @@ impl AppState {
             menu_options: MenuOptions::new(cats),
             source_data: SourceData::build(),
             text_buffer: String::new(),
+            channels: ChannelData::new(),
         })
     }
 
@@ -704,6 +728,19 @@ impl LibBookInfo {
         }
     }
 
+    pub fn get_progress(&self) -> BookProgress {
+        match &self.source_data {
+            BookSource::Local(ref data) => data.progress.progress,
+            BookSource::Global(d) => {
+                let p = d.chapter_progress.get(&d.current_chapter);
+                match p {
+                    Some(place) => place.progress,
+                    None => BookProgress::Location((0, 0)),
+                }
+            }
+        }
+    }
+
     pub fn display_info(&self) -> String {
         match self.source_data.clone() {
             BookSource::Local(data) => {
@@ -788,6 +825,7 @@ impl BookSource {
         }
     }
 
+    /// Clears any progress on any chapters
     pub fn clear_chapter_data(&mut self) {
         match self {
             BookSource::Local(_) => (),

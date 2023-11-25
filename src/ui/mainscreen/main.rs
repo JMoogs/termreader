@@ -3,7 +3,7 @@ use crate::{
     ui::mainscreen::bookoptions::{
         render_local_selection, render_mv_category_box, render_type_box,
     },
-    ui::mainscreen::sourceoptions::render_source_selection,
+    ui::{mainscreen::sourceoptions::render_source_selection, render_loading_popup},
     SELECTED_STYLE, UNSELECTED_STYLE,
 };
 use ratatui::{prelude::*, widgets::*};
@@ -44,6 +44,10 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
         4 => render_settings(chunks[1], f),
         _ => unreachable!(),
     };
+
+    if app_state.channels.loading {
+        render_loading_popup(f);
+    }
 }
 
 fn render_tabs(rect: Rect, app_state: &AppState, f: &mut Frame) {

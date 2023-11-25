@@ -385,7 +385,7 @@ impl BookProgressData {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum BookProgress {
     Location((usize, usize)),
     Finished,
@@ -401,7 +401,14 @@ impl BookPortion {
     pub fn get_progress(&self) -> Result<BookProgressData> {
         match &self.buffer {
             BufferType::Global(lines) => {
-                if self.display_end == (lines.len() - 1, lines[lines.len() - 1].len() - 1) {
+                // Comparison of the last line's length fails for some reason, so use this for now...
+                if self.display_end.0 == lines.len() - 1
+                    && self
+                        .display_end
+                        .1
+                        .abs_diff(lines[lines.len() - 1].len() - 1)
+                        < 50
+                {
                     return Ok(BookProgressData {
                         total_lines: lines.len(),
                         progress: BookProgress::Finished,
