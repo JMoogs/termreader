@@ -1,4 +1,6 @@
-use appstate::{AppState, CurrentScreen};
+use crate::helpers::StatefulList;
+use appstate::{AppState, BookInfo, CurrentScreen, SourceOptions};
+
 use crossterm::{
     event::{self, Event},
     execute, terminal,
@@ -70,6 +72,51 @@ fn run_app<B: Backend>(
             CurrentScreen::Reader => terminal.draw(|f| ui_reader(f, app_state))?,
             _ => terminal.draw(|f| ui_main(f, app_state))?,
         };
+
+        if app_state.channels.loading {
+            if let Ok(data) = app_state.channels.reciever.recv() {
+                match data {
+                    appstate::RequestData::SearchResults(res) => {
+                        app_state.source_data.novel_results = StatefulList::with_items(res?);
+                        app_state
+                            .update_screen(CurrentScreen::Sources(SourceOptions::SearchResults));
+                    }
+                    appstate::RequestData::BookInfo(res) => {
+                        let res = res?;
+                        app_state.source_data.current_novel_chaps =
+                            StatefulList::with_items(res.chapters.clone());
+                        app_state.source_data.current_novel = Some(res);
+
+                        app_state.update_screen(CurrentScreen::Sources(SourceOptions::BookView));
+                    }
+                    appstate::RequestData::ChapterTemp((res, ch_no)) => {
+                        let novel = app_state.source_data.current_novel.clone().unwrap();
+                        app_state.move_to_reader(
+                            BookInfo::from_novel_temp(novel, ch_no)?,
+                            Some(ch_no),
+                            Some(res?),
+                        )?;
+                    }
+                    appstate::RequestData::Chapter((res, ch_no)) => {
+                        let mut book = app_state
+                            .library_data
+                            .get_category_list_mut()
+                            .selected()
+                            .unwrap()
+                            .clone();
+                        book.source_data.set_chapter(ch_no);
+                        app_state.move_to_reader(
+                            BookInfo::Library(book),
+                            Some(ch_no),
+                            Some(res?),
+                        )?;
+                    }
+                }
+                // `event::read()` is blocking so continue to redraw after
+                app_state.channels.loading = false;
+                continue;
+            }
+        }
 
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Release {

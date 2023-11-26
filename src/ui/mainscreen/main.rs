@@ -14,6 +14,11 @@ use super::{
 };
 
 pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
+    if app_state.channels.loading {
+        render_loading_popup(f);
+        return;
+    }
+
     if matches!(
         app_state.current_screen,
         CurrentScreen::Sources(SourceOptions::BookView)
@@ -44,10 +49,6 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
         4 => render_settings(chunks[1], f),
         _ => unreachable!(),
     };
-
-    if app_state.channels.loading {
-        render_loading_popup(f);
-    }
 }
 
 fn render_tabs(rect: Rect, app_state: &AppState, f: &mut Frame) {

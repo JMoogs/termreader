@@ -7,8 +7,10 @@ use chrono::Local;
 use html5ever::tree_builder::TreeSink;
 use regex::Regex;
 use scraper::{Html, Selector};
+use serde::{Deserialize, Serialize};
 // https://github.com/LNReader/lnreader/blob/main/src/sources/multisrc/madara/MadaraScraper.js
 
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct MadaraScraper {
     pub source_id: SourceID,
     pub base_url: String,
@@ -35,7 +37,7 @@ impl Scrape for MadaraScraper {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct MadaraPaths {
     novels: String,
     novel: String,

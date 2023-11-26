@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::SystemTime;
 
-use crate::global::sources::{ChapterPreview, NovelPreview};
+use crate::global::sources::{Chapter, ChapterPreview, NovelPreview, SourceID};
 use crate::reader::buffer::{BookProgress, BookProgressData};
 use crate::reader::ReaderData;
 use crate::{
@@ -47,6 +47,9 @@ impl ChannelData {
 
 pub enum RequestData {
     SearchResults(Result<Vec<NovelPreview>>),
+    BookInfo(Result<Novel>),
+    ChapterTemp((Result<Chapter>, usize)),
+    Chapter((Result<Chapter>, usize)),
 }
 
 pub struct MenuOptions {
@@ -156,6 +159,7 @@ impl AppState {
         &mut self,
         mut book: BookInfo,
         chapter: Option<usize>,
+        text: Option<Chapter>,
     ) -> Result<(), anyhow::Error> {
         self.update_screen(CurrentScreen::Reader);
         match book.get_source_data_mut() {
@@ -163,8 +167,7 @@ impl AppState {
                 self.reader_data = Some(ReaderData::create(book, chapter, None)?)
             }
             BookSource::Global(_) => {
-                let source = &self.source_data.sources.selected().unwrap();
-                self.reader_data = Some(ReaderData::create(book, chapter, Some(source))?)
+                self.reader_data = Some(ReaderData::create(book, chapter, text)?)
             }
         }
 
@@ -568,9 +571,9 @@ pub enum BookInfo {
 
 impl BookInfo {
     /// Creates an instance of `BookInfo` from a `Novel`
-    pub fn from_novel_temp(novel: Novel) -> Result<Self, anyhow::Error> {
+    pub fn from_novel_temp(novel: Novel, ch: usize) -> Result<Self, anyhow::Error> {
         let name = novel.name.clone();
-        let source = BookSource::Global(GlobalBookData::create(novel));
+        let source = BookSource::Global(GlobalBookData::create(novel, ch));
 
         Ok(BookInfo::Reader(ReaderBookInfo {
             name,
@@ -596,6 +599,20 @@ impl BookInfo {
         match self {
             BookInfo::Library(d) => &d.source_data,
             BookInfo::Reader(d) => &d.source_data,
+        }
+    }
+
+    pub fn get_source_id(&self) -> Option<SourceID> {
+        match self.get_source_data() {
+            BookSource::Local(_) => None,
+            BookSource::Global(d) => Some(d.novel.source),
+        }
+    }
+
+    pub fn get_novel(&self) -> Option<&Novel> {
+        match self.get_source_data() {
+            BookSource::Local(_) => None,
+            BookSource::Global(d) => Some(&d.novel),
         }
     }
 
@@ -685,7 +702,7 @@ impl LibBookInfo {
     }
 
     pub fn from_global(novel: Novel, category: Option<String>) -> Result<Self, anyhow::Error> {
-        let data = GlobalBookData::create(novel);
+        let data = GlobalBookData::create(novel, 1);
         let source = BookSource::Global(data);
         Ok(Self {
             name: source.get_name(),
@@ -845,11 +862,11 @@ pub struct GlobalBookData {
 }
 
 impl GlobalBookData {
-    pub fn create(novel: Novel) -> Self {
+    pub fn create(novel: Novel, ch: usize) -> Self {
         Self {
             name: novel.name.clone(),
             read_chapters: HashSet::new(),
-            current_chapter: 1,
+            current_chapter: ch,
             total_chapters: novel.chapters.len(),
             chapter_progress: HashMap::new(),
             novel,

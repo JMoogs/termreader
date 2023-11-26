@@ -1,6 +1,6 @@
 use crate::{
     appstate::{BookInfo, BookSource},
-    global::sources::{source_data::Source, Scrape},
+    global::sources::Chapter,
     reader::buffer::BufferType,
 };
 
@@ -54,8 +54,8 @@ impl ReaderData {
 
     pub fn create(
         mut book: BookInfo,
-        chapter: Option<usize>,
-        source: Option<&Source>,
+        chapter_no: Option<usize>,
+        text: Option<Chapter>,
     ) -> Result<Self, anyhow::Error> {
         match book.get_source_data_mut() {
             BookSource::Local(data) => {
@@ -71,18 +71,13 @@ impl ReaderData {
                 })
             }
             BookSource::Global(data) => {
-                let ch = chapter.unwrap();
+                let ch = chapter_no.unwrap();
                 let line = match data.chapter_progress.get(&ch) {
                     Some(progress) => progress.get_line(),
                     None => 0,
                 };
 
-                let source = source.unwrap();
-                let text = source.parse_chapter(
-                    data.novel.novel_url.clone(),
-                    data.novel.get_chapter_url(ch).unwrap(),
-                )?;
-
+                let text = text.unwrap();
                 let lines = text
                     .chapter_contents
                     .lines()

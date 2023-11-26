@@ -1,6 +1,7 @@
 use crate::global::sources::SortOrder;
 use anyhow::Result;
 use ratatui::widgets::ListState;
+use serde::{Deserialize, Serialize};
 
 use crate::helpers::StatefulList;
 
@@ -16,6 +17,7 @@ pub struct SourceData {
     pub current_book_ui_option: SourceBookBox,
 }
 
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Source {
     Madara(MadaraScraper),
 }
@@ -24,6 +26,12 @@ impl Source {
     fn get_name(&self) -> String {
         match self {
             Source::Madara(s) => s.source_name.clone(),
+        }
+    }
+
+    fn get_id(&self) -> SourceID {
+        match self {
+            Source::Madara(s) => s.source_id,
         }
     }
 }
@@ -151,5 +159,15 @@ impl SourceData {
 
     pub fn get_state_mut(&mut self) -> &mut ListState {
         &mut self.sources.state
+    }
+
+    pub fn get_source_by_id(&self, id: SourceID) -> &Source {
+        for s in self.sources.items.iter() {
+            if s.get_id() == id {
+                return s;
+            }
+        }
+        // There should always be a source
+        unreachable!()
     }
 }
