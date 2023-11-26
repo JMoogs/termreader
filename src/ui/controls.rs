@@ -3,7 +3,7 @@ use crate::{
         AppState, BookInfo, BookSource, CurrentScreen, HistoryOptions, LibBookInfo, LibraryOptions,
         SettingsOptions, SourceOptions, UpdateOptions,
     },
-    global::sources::{source_data::SourceBookBox, SortOrder},
+    global::sources::{source_data::SourceBookBox, Scrape, SortOrder},
     helpers::StatefulList,
     reader::buffer::BookProgress,
 };
@@ -110,7 +110,7 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
                     app_state.to_lib_screen();
                 }
                 CurrentScreen::Sources(SourceOptions::SourceSelect) => {
-                    let source = &app_state.source_data.get_list().selected().unwrap().1;
+                    let source = app_state.source_data.get_list().selected().unwrap();
                     let res = source.search_novels(&app_state.text_buffer)?;
                     app_state.source_data.novel_results = StatefulList::with_items(res);
                     app_state.update_screen(CurrentScreen::Sources(SourceOptions::SearchResults));
@@ -517,7 +517,7 @@ fn control_source_select(app_state: &mut AppState, event: event::KeyCode) -> Res
                     app_state.update_screen(CurrentScreen::Typing);
                 }
                 1 => {
-                    let source = &app_state.source_data.get_list().selected().unwrap().1;
+                    let source = app_state.source_data.get_list().selected().unwrap();
                     let res = source.get_popular(SortOrder::Rating, 1)?;
                     app_state.source_data.novel_results = StatefulList::with_items(res);
                     app_state.update_screen(CurrentScreen::Sources(SourceOptions::SearchResults));
@@ -622,7 +622,7 @@ fn control_source_search_result(app_state: &mut AppState, event: event::KeyCode)
         KeyCode::Down => app_state.source_data.novel_results.next(),
         KeyCode::Enter => {
             let url = &app_state.source_data.novel_results.selected().unwrap().url;
-            let source = &app_state.source_data.sources.selected().unwrap().1;
+            let source = app_state.source_data.sources.selected().unwrap();
 
             let full_book = source.parse_novel_and_chapters(url.clone())?;
 

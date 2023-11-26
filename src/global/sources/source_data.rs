@@ -1,3 +1,5 @@
+use crate::global::sources::SortOrder;
+use anyhow::Result;
 use ratatui::widgets::ListState;
 
 use crate::helpers::StatefulList;
@@ -5,15 +7,51 @@ use crate::helpers::StatefulList;
 use super::madara::{MadaraPaths, MadaraScraper};
 use super::{ChapterPreview, Novel, NovelPreview, Scrape, SourceID};
 
-type StatefulSourceList = StatefulList<(String, Box<dyn Scrape>)>;
-
 pub struct SourceData {
-    pub sources: StatefulSourceList,
+    pub sources: StatefulList<Source>,
     pub novel_results: StatefulList<NovelPreview>,
     pub current_novel: Option<Novel>,
     pub current_novel_scroll: usize,
     pub current_novel_chaps: StatefulList<ChapterPreview>,
     pub current_book_ui_option: SourceBookBox,
+}
+
+pub enum Source {
+    Madara(MadaraScraper),
+}
+
+impl Source {
+    fn get_name(&self) -> String {
+        match self {
+            Source::Madara(s) => s.source_name.clone(),
+        }
+    }
+}
+
+impl Scrape for Source {
+    fn get_popular(&self, sort_order: SortOrder, page: usize) -> Result<Vec<NovelPreview>> {
+        match self {
+            Source::Madara(s) => s.get_popular(sort_order, page),
+        }
+    }
+
+    fn parse_novel_and_chapters(&self, novel_path: String) -> Result<Novel> {
+        match self {
+            Source::Madara(s) => s.parse_novel_and_chapters(novel_path),
+        }
+    }
+
+    fn parse_chapter(&self, novel_path: String, chapter_path: String) -> Result<super::Chapter> {
+        match self {
+            Source::Madara(s) => s.parse_chapter(novel_path, chapter_path),
+        }
+    }
+
+    fn search_novels(&self, search_term: &str) -> Result<Vec<NovelPreview>> {
+        match self {
+            Source::Madara(s) => s.search_novels(search_term),
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -25,67 +63,61 @@ pub enum SourceBookBox {
 
 impl SourceData {
     pub fn build() -> Self {
-        let box_novel = MadaraScraper::new(
+        let box_novel = Source::Madara(MadaraScraper::new(
             SourceID::new(1),
             "https://boxnovel.com/".into(),
             "BoxNovel".into(),
             None,
             true,
-        );
-        let box_novel: Box<dyn Scrape> = Box::new(box_novel);
+        ));
 
-        let zinn_novel = MadaraScraper::new(
+        let zinn_novel = Source::Madara(MadaraScraper::new(
             SourceID::new(2),
             "https://zinnovel.com/".into(),
             "ZinnNovel".into(),
             Some(MadaraPaths::new("manga", "manga", "manga")),
             false,
-        );
-        let zinn_novel: Box<dyn Scrape> = Box::new(zinn_novel);
+        ));
 
-        let novel_translate = MadaraScraper::new(
+        let novel_translate = Source::Madara(MadaraScraper::new(
             SourceID::new(3),
             "https://noveltranslate.com/".into(),
             "NovelTranslate".into(),
             Some(MadaraPaths::new("all-novels", "novel", "novel")),
             false,
-        );
-        let novel_translate: Box<dyn Scrape> = Box::new(novel_translate);
+        ));
 
-        let lunar_letters = MadaraScraper::new(
+        let lunar_letters = Source::Madara(MadaraScraper::new(
             SourceID::new(4),
             "https://lunarletters.com/".into(),
             "LunarLetters".into(),
             Some(MadaraPaths::new("series", "series", "series")),
             true,
-        );
-        let lunar_letters: Box<dyn Scrape> = Box::new(lunar_letters);
+        ));
 
-        let sleepy_translations = MadaraScraper::new(
+        let sleepy_translations = Source::Madara(MadaraScraper::new(
             SourceID::new(5),
             "https://sleepytranslations.com/".into(),
             "SleepyTranslations".into(),
             Some(MadaraPaths::new("series", "series", "series")),
             true,
-        );
-        let sleepy_translations: Box<dyn Scrape> = Box::new(sleepy_translations);
+        ));
 
-        let free_novel_me = MadaraScraper::new(
+        let free_novel_me = Source::Madara(MadaraScraper::new(
             SourceID::new(6),
             "https://freenovel.me/".into(),
             "FreeNovelMe".into(),
             None,
             false,
-        );
-        let free_novel_me: Box<dyn Scrape> = Box::new(free_novel_me);
+        ));
 
         let v = vec![
-            (String::from("BoxNovel"), box_novel),
-            (String::from("ZinnNovel"), zinn_novel),
-            (String::from("NovelTranslate"), novel_translate),
-            (String::from("LunarLetters"), lunar_letters),
-            (String::from("SleepyTranslations"), sleepy_translations),
-            (String::from("FreeNovelMe"), free_novel_me),
+            box_novel,
+            zinn_novel,
+            novel_translate,
+            lunar_letters,
+            sleepy_translations,
+            free_novel_me,
         ];
 
         let mut sources = StatefulList::with_items(v);
@@ -101,16 +133,16 @@ impl SourceData {
         }
     }
 
-    pub fn get_list(&mut self) -> &StatefulSourceList {
+    pub fn get_list(&mut self) -> &StatefulList<Source> {
         &self.sources
     }
 
-    pub fn get_list_mut(&mut self) -> &mut StatefulSourceList {
+    pub fn get_list_mut(&mut self) -> &mut StatefulList<Source> {
         &mut self.sources
     }
 
     pub fn get_source_names(&self) -> Vec<String> {
-        self.sources.items.iter().map(|t| t.0.clone()).collect()
+        self.sources.items.iter().map(|t| t.get_name()).collect()
     }
 
     pub fn get_state(&self) -> &ListState {

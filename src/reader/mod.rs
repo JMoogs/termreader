@@ -1,6 +1,6 @@
 use crate::{
     appstate::{BookInfo, BookSource},
-    global::sources::Scrape,
+    global::sources::{source_data::Source, Scrape},
     reader::buffer::BufferType,
 };
 
@@ -55,7 +55,7 @@ impl ReaderData {
     pub fn create(
         mut book: BookInfo,
         chapter: Option<usize>,
-        source: Option<&Box<dyn Scrape>>,
+        source: Option<&Source>,
     ) -> Result<Self, anyhow::Error> {
         match book.get_source_data_mut() {
             BookSource::Local(data) => {

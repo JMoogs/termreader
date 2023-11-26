@@ -163,7 +163,7 @@ impl AppState {
                 self.reader_data = Some(ReaderData::create(book, chapter, None)?)
             }
             BookSource::Global(_) => {
-                let source = &self.source_data.sources.selected().unwrap().1;
+                let source = &self.source_data.sources.selected().unwrap();
                 self.reader_data = Some(ReaderData::create(book, chapter, Some(source))?)
             }
         }

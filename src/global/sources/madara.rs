@@ -10,11 +10,11 @@ use scraper::{Html, Selector};
 // https://github.com/LNReader/lnreader/blob/main/src/sources/multisrc/madara/MadaraScraper.js
 
 pub struct MadaraScraper {
-    source_id: SourceID,
-    base_url: String,
-    source_name: String,
-    path: Option<MadaraPaths>,
-    new_chap_endpoint: bool,
+    pub source_id: SourceID,
+    pub base_url: String,
+    pub source_name: String,
+    pub path: Option<MadaraPaths>,
+    pub new_chap_endpoint: bool,
 }
 
 impl Scrape for MadaraScraper {
