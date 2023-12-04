@@ -237,7 +237,8 @@ impl MadaraScraper {
             }
 
             let url =
-                reqwest::Url::parse(&format!("{}{}", url, "wp-admin/admin-ajax.php")).unwrap();
+                reqwest::Url::parse(&format!("{}{}", self.base_url, "wp-admin/admin-ajax.php"))
+                    .unwrap();
 
             let form = reqwest::blocking::multipart::Form::new()
                 .text("action", "manga_get_chapters")
@@ -462,46 +463,46 @@ mod tests {
 
     #[test]
     fn get_popular() {
-        let boxnovel = MadaraScraper::new(
+        let source = MadaraScraper::new(
             SourceID::new(1),
             "https://boxnovel.com/".into(),
-            "BoxNovel".into(),
+            "Source".into(),
             None,
             true,
         );
 
-        let popular = boxnovel.get_popular(SortOrder::Rating, 1);
+        let popular = source.get_popular(SortOrder::Rating, 1);
 
         println!("{:?}", popular);
     }
 
     #[test]
     fn get_chapters() {
-        let boxnovel = MadaraScraper::new(
+        let source = MadaraScraper::new(
             SourceID::new(1),
-            "https://boxnovel.com/".into(),
-            "BoxNovel".into(),
-            None,
-            true,
+            "https://noveltranslate.com/".into(),
+            "Source".into(),
+            Some(MadaraPaths::new("all-novels", "novel", "novel")),
+            false,
         );
 
-        let chaps = boxnovel
-            .parse_novel_and_chapters("awakening-the-weakest-talent-only-i-level-up".into());
+        let chaps = source
+            .parse_novel_and_chapters("full-time-hunter-bind-a-prison-at-the-beginning".into());
 
         println!("{chaps:?}");
     }
 
     #[test]
     fn parse_chapter() {
-        let boxnovel = MadaraScraper::new(
+        let source = MadaraScraper::new(
             SourceID::new(1),
             "https://boxnovel.com/".into(),
-            "BoxNovel".into(),
+            "Source".into(),
             None,
             true,
         );
 
-        let chap = boxnovel.parse_chapter(
+        let chap = source.parse_chapter(
             "awakening-the-weakest-talent-only-i-level-up".into(),
             "chapter-964".into(),
         );
@@ -510,15 +511,15 @@ mod tests {
 
     #[test]
     fn search_novel() {
-        let boxnovel = MadaraScraper::new(
+        let source = MadaraScraper::new(
             SourceID::new(1),
             "https://boxnovel.com/".into(),
-            "BoxNovel".into(),
+            "Source".into(),
             None,
             true,
         );
 
-        let s = boxnovel.search_novels("awakening");
+        let s = source.search_novels("awakening");
         println!("{s:?}");
     }
 }

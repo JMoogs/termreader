@@ -135,7 +135,7 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
 
 fn control_main_menu(app_state: &mut AppState, event: event::KeyCode) {
     match event {
-        KeyCode::Char(']') => {
+        KeyCode::Char(']') | KeyCode::Tab => {
             app_state.current_main_tab.next();
             match app_state.current_main_tab.index {
                 0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
@@ -146,31 +146,7 @@ fn control_main_menu(app_state: &mut AppState, event: event::KeyCode) {
                 _ => unreachable!(),
             };
         }
-        KeyCode::Char('[') => {
-            app_state.current_main_tab.previous();
-            match app_state.current_main_tab.index {
-                0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
-                1 => app_state.current_screen = CurrentScreen::Updates(UpdateOptions::Default),
-                2 => app_state.current_screen = CurrentScreen::Sources(SourceOptions::Default),
-                3 => app_state.current_screen = CurrentScreen::History(HistoryOptions::Default),
-                4 => app_state.current_screen = CurrentScreen::Settings(SettingsOptions::Default),
-                _ => unreachable!(),
-            };
-        }
-
-        KeyCode::Right => {
-            app_state.current_main_tab.next();
-            match app_state.current_main_tab.index {
-                0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
-                1 => app_state.current_screen = CurrentScreen::Updates(UpdateOptions::Default),
-                2 => app_state.current_screen = CurrentScreen::Sources(SourceOptions::Default),
-                3 => app_state.current_screen = CurrentScreen::History(HistoryOptions::Default),
-                4 => app_state.current_screen = CurrentScreen::Settings(SettingsOptions::Default),
-
-                _ => unreachable!(),
-            };
-        }
-        KeyCode::Left => {
+        KeyCode::Char('[') | KeyCode::BackTab => {
             app_state.current_main_tab.previous();
             match app_state.current_main_tab.index {
                 0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
@@ -270,12 +246,12 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
 
 fn control_library_menu(app_state: &mut AppState, event: event::KeyCode) -> Result<()> {
     match event {
-        KeyCode::Char('}') => {
+        KeyCode::Char('}') | KeyCode::Right => {
             if app_state.current_main_tab.in_library() {
                 app_state.library_data.categories.next();
             }
         }
-        KeyCode::Char('{') => {
+        KeyCode::Char('{') | KeyCode::Left => {
             if app_state.current_main_tab.in_library() {
                 app_state.library_data.categories.previous();
             }
@@ -579,7 +555,7 @@ fn control_library_chapter_view(app_state: &mut AppState, event: event::KeyCode)
                 });
             }
         }
-        KeyCode::Char('[') | KeyCode::Char(']') => {
+        KeyCode::Char('[') | KeyCode::BackTab | KeyCode::Char(']') | KeyCode::Tab => {
             app_state.library_data.menu_data.ch_selected =
                 !app_state.library_data.menu_data.ch_selected;
         }
@@ -643,7 +619,7 @@ fn control_source_select(app_state: &mut AppState, event: event::KeyCode) -> Res
 
 fn control_source_book_view(app_state: &mut AppState, event: event::KeyCode) -> Result<()> {
     match event {
-        KeyCode::Char(']') => match app_state.source_data.current_book_ui_option {
+        KeyCode::Char(']') | KeyCode::Tab => match app_state.source_data.current_book_ui_option {
             SourceBookBox::Options => {
                 app_state.source_data.current_book_ui_option = SourceBookBox::Chapters
             }
@@ -654,7 +630,8 @@ fn control_source_book_view(app_state: &mut AppState, event: event::KeyCode) -> 
                 app_state.source_data.current_book_ui_option = SourceBookBox::Options
             }
         },
-        KeyCode::Char('[') => match app_state.source_data.current_book_ui_option {
+        KeyCode::Char('[') | KeyCode::BackTab => match app_state.source_data.current_book_ui_option
+        {
             SourceBookBox::Options => {
                 app_state.source_data.current_book_ui_option = SourceBookBox::Summary
             }
