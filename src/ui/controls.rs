@@ -205,6 +205,8 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
             if let Some(c) = ch {
                 let mut book = app_state.reader_data.as_ref().unwrap().book_info.clone();
 
+                let in_library = matches!(book, BookInfo::Library(_));
+
                 book.get_source_data_mut().set_chapter(c);
                 let novel = book.get_novel().unwrap().clone();
                 let source = app_state
@@ -217,7 +219,11 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
                 thread::spawn(move || {
                     let text = source
                         .parse_chapter(novel.novel_url.clone(), novel.get_chapter_url(c).unwrap());
-                    let _ = tx.send(RequestData::Chapter((text, c)));
+                    if in_library {
+                        let _ = tx.send(RequestData::Chapter((text, c)));
+                    } else {
+                        let _ = tx.send(RequestData::ChapterTemp((text, c)));
+                    }
                 });
 
                 // app_state.move_to_reader(book, Some(c))?;
@@ -235,6 +241,8 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
             if let Some(c) = ch {
                 let book = app_state.reader_data.as_ref().unwrap().book_info.clone();
 
+                let in_library = matches!(book, BookInfo::Library(_));
+
                 let novel = book.get_novel().unwrap().clone();
                 let source = app_state
                     .source_data
@@ -246,7 +254,11 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
                 thread::spawn(move || {
                     let text = source
                         .parse_chapter(novel.novel_url.clone(), novel.get_chapter_url(c).unwrap());
-                    let _ = tx.send(RequestData::Chapter((text, c)));
+                    if in_library {
+                        let _ = tx.send(RequestData::Chapter((text, c)));
+                    } else {
+                        let _ = tx.send(RequestData::ChapterTemp((text, c)));
+                    }
                 });
                 // app_state.move_to_reader(book, Some(c))?;
             }
