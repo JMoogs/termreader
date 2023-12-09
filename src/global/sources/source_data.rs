@@ -84,7 +84,7 @@ impl SourceData {
             "https://zinnovel.com/".into(),
             "ZinnNovel".into(),
             Some(MadaraPaths::new("manga", "manga", "manga")),
-            false,
+            true,
         ));
 
         let novel_translate = Source::Madara(MadaraScraper::new(
@@ -92,19 +92,11 @@ impl SourceData {
             "https://noveltranslate.com/".into(),
             "NovelTranslate".into(),
             Some(MadaraPaths::new("all-novels", "novel", "novel")),
-            false,
-        ));
-
-        let lunar_letters = Source::Madara(MadaraScraper::new(
-            SourceID::new(4),
-            "https://lunarletters.com/".into(),
-            "LunarLetters".into(),
-            Some(MadaraPaths::new("series", "series", "series")),
             true,
         ));
 
         let sleepy_translations = Source::Madara(MadaraScraper::new(
-            SourceID::new(5),
+            SourceID::new(4),
             "https://sleepytranslations.com/".into(),
             "SleepyTranslations".into(),
             Some(MadaraPaths::new("series", "series", "series")),
@@ -112,20 +104,64 @@ impl SourceData {
         ));
 
         let free_novel_me = Source::Madara(MadaraScraper::new(
-            SourceID::new(6),
+            SourceID::new(5),
             "https://freenovel.me/".into(),
             "FreeNovelMe".into(),
             None,
             false,
         ));
 
+        let first_kiss_novel = Source::Madara(MadaraScraper::new(
+            SourceID::new(6),
+            "https://1stkissnovel.org/".into(),
+            "FirstKissNovel".into(),
+            None,
+            true,
+        ));
+
+        let most_novel = Source::Madara(MadaraScraper::new(
+            SourceID::new(7),
+            "https://mostnovel.com/".into(),
+            "MostNovel".into(),
+            Some(MadaraPaths::new("manga", "manga", "manga")),
+            true,
+        ));
+
+        let novel_multiverse = Source::Madara(MadaraScraper::new(
+            SourceID::new(8),
+            "https://www.novelmultiverse.com/".into(),
+            "NovelMultiverse".into(),
+            None,
+            true,
+        ));
+
+        let wuxia_world_site = Source::Madara(MadaraScraper::new(
+            SourceID::new(9),
+            "https://wuxiaworld.site/".into(),
+            "WuxiaWorldSite".into(),
+            None,
+            true,
+        ));
+
+        let novel_r18 = Source::Madara(MadaraScraper::new(
+            SourceID::new(10),
+            "https://novelr18.com/".into(),
+            "NovelR18".into(),
+            Some(MadaraPaths::new("novel", "manga", "manga")),
+            true,
+        ));
+
         let v = vec![
             box_novel,
             zinn_novel,
             novel_translate,
-            lunar_letters,
             sleepy_translations,
             free_novel_me,
+            first_kiss_novel,
+            most_novel,
+            novel_multiverse,
+            wuxia_world_site,
+            novel_r18,
         ];
 
         let mut sources = StatefulList::with_items(v);

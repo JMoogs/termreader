@@ -480,14 +480,13 @@ mod tests {
     fn get_chapters() {
         let source = MadaraScraper::new(
             SourceID::new(1),
-            "https://noveltranslate.com/".into(),
+            "https://zinnovel.com/".into(),
             "Source".into(),
-            Some(MadaraPaths::new("all-novels", "novel", "novel")),
-            false,
+            Some(MadaraPaths::new("manga", "manga", "manga")),
+            true,
         );
 
-        let chaps = source
-            .parse_novel_and_chapters("full-time-hunter-bind-a-prison-at-the-beginning".into());
+        let chaps = source.parse_novel_and_chapters("beastmaster-of-the-ages".into());
 
         println!("{chaps:?}");
     }
@@ -496,15 +495,15 @@ mod tests {
     fn parse_chapter() {
         let source = MadaraScraper::new(
             SourceID::new(1),
-            "https://boxnovel.com/".into(),
+            "https://zinnovel.com/".into(),
             "Source".into(),
-            None,
-            true,
+            Some(MadaraPaths::new("manga", "manga", "manga")),
+            false,
         );
 
         let chap = source.parse_chapter(
-            "awakening-the-weakest-talent-only-i-level-up".into(),
-            "chapter-964".into(),
+            "beastmaster-of-the-ages".into(),
+            "chapter-2496-beast-massacre".into(),
         );
         println!("{chap:?}");
     }
