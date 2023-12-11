@@ -1,6 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+pub mod freewebnovel;
 pub mod madara;
 pub mod source_data;
 
@@ -101,6 +102,12 @@ pub struct SourceID(usize);
 impl SourceID {
     pub fn new(id: usize) -> Self {
         Self(id)
+    }
+}
+
+impl From<usize> for SourceID {
+    fn from(value: usize) -> Self {
+        SourceID(value)
     }
 }
 

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::helpers::StatefulList;
 
+use super::freewebnovel::FreeWebNovelScraper;
 use super::madara::{MadaraPaths, MadaraScraper};
 use super::{ChapterPreview, Novel, NovelPreview, Scrape, SourceID};
 
@@ -20,18 +21,21 @@ pub struct SourceData {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Source {
     Madara(MadaraScraper),
+    FreeWebNovel(FreeWebNovelScraper),
 }
 
 impl Source {
     fn get_name(&self) -> String {
         match self {
             Source::Madara(s) => s.source_name.clone(),
+            Source::FreeWebNovel(_) => "FreeWebNovel".into(),
         }
     }
 
     fn get_id(&self) -> SourceID {
         match self {
             Source::Madara(s) => s.source_id,
+            Source::FreeWebNovel(s) => s.source_id,
         }
     }
 }
@@ -40,24 +44,28 @@ impl Scrape for Source {
     fn get_popular(&self, sort_order: SortOrder, page: usize) -> Result<Vec<NovelPreview>> {
         match self {
             Source::Madara(s) => s.get_popular(sort_order, page),
+            Source::FreeWebNovel(s) => s.get_popular(sort_order, page),
         }
     }
 
     fn parse_novel_and_chapters(&self, novel_path: String) -> Result<Novel> {
         match self {
             Source::Madara(s) => s.parse_novel_and_chapters(novel_path),
+            Source::FreeWebNovel(s) => s.parse_novel_and_chapters(novel_path),
         }
     }
 
     fn parse_chapter(&self, novel_path: String, chapter_path: String) -> Result<super::Chapter> {
         match self {
             Source::Madara(s) => s.parse_chapter(novel_path, chapter_path),
+            Source::FreeWebNovel(s) => s.parse_chapter(novel_path, chapter_path),
         }
     }
 
     fn search_novels(&self, search_term: &str) -> Result<Vec<NovelPreview>> {
         match self {
             Source::Madara(s) => s.search_novels(search_term),
+            Source::FreeWebNovel(s) => s.search_novels(search_term),
         }
     }
 }
@@ -151,6 +159,8 @@ impl SourceData {
             true,
         ));
 
+        let free_web_novel = Source::FreeWebNovel(FreeWebNovelScraper::new(SourceID::new(11)));
+
         let v = vec![
             box_novel,
             zinn_novel,
@@ -162,6 +172,7 @@ impl SourceData {
             novel_multiverse,
             wuxia_world_site,
             novel_r18,
+            free_web_novel,
         ];
 
         let mut sources = StatefulList::with_items(v);
