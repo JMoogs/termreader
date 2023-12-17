@@ -149,6 +149,11 @@ impl AppState {
         let lib_info = startup::load_books()?;
         let library_data = LibraryData::from(lib_info);
 
+        let mut history_data = startup::load_history()?;
+        if !history_data.history.is_empty() {
+            history_data.selected.select(Some(0));
+        }
+
         let cats = library_data.categories.tabs.clone();
 
         Ok(Self {
@@ -162,11 +167,7 @@ impl AppState {
                 String::from("Settings"),
             ]),
             library_data,
-            // TODO: Load from file
-            history_data: HistoryData {
-                history: VecDeque::new(),
-                selected: ListState::default(),
-            },
+            history_data,
             reader_data: None,
             menu_options: MenuOptions::new(cats),
             source_data: SourceData::build(),
@@ -225,6 +226,17 @@ impl AppState {
                 .expect("Time has once again gone VERY backwards.")
         }
         .as_secs();
+
+        // Remove any previous instances
+        let mut index = None;
+        for (i, item) in self.history_data.history.iter().enumerate() {
+            if item.book == info {
+                index = Some(i)
+            }
+        }
+        if let Some(idx) = index {
+            self.history_data.history.remove(idx);
+        }
 
         self.history_data.history.push_front(HistoryEntry {
             book: info,
@@ -513,6 +525,7 @@ pub enum SourceOptions {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum HistoryOptions {
     Default,
+    HistoryBookOptions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
@@ -698,7 +711,7 @@ pub struct ReaderBookInfo {
 }
 
 /// Contains info about a book.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LibBookInfo {
     /// The name of the book.
     pub name: String,
@@ -708,6 +721,12 @@ pub struct LibBookInfo {
     pub category: Option<String>,
     /// The unique ID of the book.
     pub id: ID,
+}
+
+impl PartialEq for LibBookInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
 impl LibBookInfo {
@@ -883,7 +902,7 @@ impl BookSource {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GlobalBookData {
     pub name: String,
     pub read_chapters: HashSet<usize>,
@@ -891,6 +910,12 @@ pub struct GlobalBookData {
     pub total_chapters: usize,
     pub chapter_progress: HashMap<usize, BookProgressData>,
     pub novel: Novel,
+}
+
+impl PartialEq for GlobalBookData {
+    fn eq(&self, other: &Self) -> bool {
+        self.novel == other.novel
+    }
 }
 
 impl GlobalBookData {

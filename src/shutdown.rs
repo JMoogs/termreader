@@ -11,7 +11,7 @@ pub fn store_books(books: &LibraryJson) -> Result<()> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistoryJson {
-    history: VecDeque<HistoryEntry>,
+    pub history: VecDeque<HistoryEntry>,
 }
 
 impl HistoryJson {

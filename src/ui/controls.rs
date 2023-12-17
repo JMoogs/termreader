@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::Result;
 use crossterm::event::{self, KeyCode};
+use ratatui::widgets::ListState;
 
 pub fn handle_controls(app_state: &mut AppState, event: event::KeyCode) -> Result<bool> {
     // On the rename screen, we just want to append to the string
@@ -51,7 +52,13 @@ pub fn handle_controls(app_state: &mut AppState, event: event::KeyCode) -> Resul
             SourceOptions::BookView => control_source_book_view(app_state, event)?,
         },
         CurrentScreen::History(option) => match option {
-            HistoryOptions::Default => control_main_menu(app_state, event),
+            HistoryOptions::Default => {
+                control_main_menu(app_state, event);
+                control_history_menu(app_state, event)?;
+            }
+            HistoryOptions::HistoryBookOptions => {
+                unimplemented!()
+            }
         },
         CurrentScreen::Settings(option) => match option {
             SettingsOptions::Default => control_main_menu(app_state, event),
@@ -121,9 +128,6 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
                         let res = source.search_novels(&text);
                         let _ = tx.send(RequestData::SearchResults(res));
                     });
-
-                    // app_state.source_data.novel_results = StatefulList::with_items(res);
-                    // app_state.update_screen(CurrentScreen::Sources(SourceOptions::SearchResults));
                 }
                 _ => unreachable!(),
             }
@@ -201,8 +205,6 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
                         let _ = tx.send(RequestData::ChapterTemp((text, c)));
                     }
                 });
-
-                // app_state.move_to_reader(book, Some(c))?;
             }
         }
         KeyCode::Left => {
@@ -236,7 +238,6 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
                         let _ = tx.send(RequestData::ChapterTemp((text, c)));
                     }
                 });
-                // app_state.move_to_reader(book, Some(c))?;
             }
         }
         _ => (),
@@ -244,6 +245,44 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
     Ok(())
 }
 
+fn control_history_menu(app_state: &mut AppState, event: event::KeyCode) -> Result<()> {
+    if app_state.history_data.history.is_empty() {
+        return Ok(());
+    }
+    let hist_len = app_state.history_data.history.len();
+    match event {
+        KeyCode::Up => {
+            if app_state.history_data.selected == ListState::default()
+                || app_state.history_data.selected.selected() == Some(0)
+            {
+                app_state.history_data.selected.select(Some(hist_len - 1))
+            } else {
+                app_state
+                    .history_data
+                    .selected
+                    .select(app_state.history_data.selected.selected().map(|i| i - 1))
+            }
+        }
+        KeyCode::Down => {
+            if app_state.history_data.selected == ListState::default() {
+                app_state.history_data.selected.select(Some(0))
+            } else {
+                app_state.history_data.selected.select(
+                    app_state
+                        .history_data
+                        .selected
+                        .selected()
+                        .map(|i| (i + 1) % hist_len),
+                )
+            }
+        }
+        KeyCode::Enter => {
+            app_state.update_screen(CurrentScreen::History(HistoryOptions::HistoryBookOptions))
+        }
+        _ => (),
+    }
+    Ok(())
+}
 fn control_library_menu(app_state: &mut AppState, event: event::KeyCode) -> Result<()> {
     match event {
         KeyCode::Char('}') | KeyCode::Right => {

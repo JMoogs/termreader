@@ -4,13 +4,19 @@ use std::path::Path;
 
 use crate::reader::buffer::BookProgressData;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialOrd, Serialize, Deserialize)]
 pub struct LocalBookData {
     pub name: String,
     pub path_to_book: String,
     pub hash: String,
     pub progress: BookProgressData,
     pub format: BookType,
+}
+
+impl PartialEq for LocalBookData {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
 }
 
 impl LocalBookData {
