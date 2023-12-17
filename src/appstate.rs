@@ -1,6 +1,7 @@
 use anyhow::Result;
+use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::SystemTime;
 
@@ -21,11 +22,25 @@ pub struct AppState {
     pub current_main_tab: CategoryTabs,
     pub library_data: LibraryData,
     pub reader_data: Option<ReaderData>,
+    pub history_data: HistoryData,
     pub menu_options: MenuOptions,
     pub source_data: SourceData,
     /// A buffer to store any text that may be typed by the user.
     pub text_buffer: String,
     pub channels: ChannelData,
+}
+
+#[derive(Debug, Clone)]
+pub struct HistoryData {
+    pub history: VecDeque<HistoryEntry>,
+    pub selected: ListState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryEntry {
+    pub book: BookInfo,
+    pub timestamp: u64,
+    pub chapter: usize,
 }
 
 pub struct ChannelData {
@@ -147,6 +162,11 @@ impl AppState {
                 String::from("Settings"),
             ]),
             library_data,
+            // TODO: Load from file
+            history_data: HistoryData {
+                history: VecDeque::new(),
+                selected: ListState::default(),
+            },
             reader_data: None,
             menu_options: MenuOptions::new(cats),
             source_data: SourceData::build(),
@@ -174,7 +194,7 @@ impl AppState {
         Ok(())
     }
 
-    pub fn update_lib_from_reader(&mut self) -> Result<()> {
+    pub fn update_from_reader(&mut self) -> Result<()> {
         let reader_data = if self.reader_data.is_none() {
             return Ok(());
         } else {
@@ -183,22 +203,34 @@ impl AppState {
 
         reader_data.set_progress()?;
 
-        let reader_data = match &reader_data.book_info {
-            BookInfo::Library(d) => d,
-            BookInfo::Reader(_) => return Ok(()),
-        };
-
-        let copy = reader_data.clone();
-        let id = copy.id;
-
-        let b = self.library_data.find_book_mut(id);
-
-        match b {
-            None => panic!(),
-            Some(book) => {
-                let _ = std::mem::replace(book, copy);
+        // For updating the library, we only care if the book is in the library.
+        if let BookInfo::Library(d) = &reader_data.book_info {
+            let copy = d.clone();
+            let id = copy.id;
+            let b = self.library_data.find_book_mut(id);
+            match b {
+                None => panic!("This should be unreachable"),
+                Some(book) => {
+                    let _ = std::mem::replace(book, copy);
+                }
             }
         }
+
+        // Adding to the history:
+        let info = reader_data.book_info.clone();
+        let ch = info.get_source_data().get_chapter();
+        let timestamp = {
+            let now = SystemTime::now();
+            now.duration_since(SystemTime::UNIX_EPOCH)
+                .expect("Time has once again gone VERY backwards.")
+        }
+        .as_secs();
+
+        self.history_data.history.push_front(HistoryEntry {
+            book: info,
+            timestamp,
+            chapter: ch,
+        });
 
         Ok(())
     }
@@ -563,7 +595,7 @@ impl From<LibraryData> for LibraryJson {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum BookInfo {
     Library(LibBookInfo),
     Reader(ReaderBookInfo),
@@ -659,7 +691,7 @@ impl BookInfo {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ReaderBookInfo {
     pub name: String,
     pub source_data: BookSource,

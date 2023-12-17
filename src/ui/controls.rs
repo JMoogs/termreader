@@ -65,7 +65,7 @@ pub fn handle_controls(app_state: &mut AppState, event: event::KeyCode) -> Resul
 
 fn control_back(app_state: &mut AppState) -> Result<bool> {
     if app_state.current_screen.in_reader() {
-        app_state.update_lib_from_reader()?;
+        app_state.update_from_reader()?;
     }
 
     if app_state.prev_screens.is_empty() {

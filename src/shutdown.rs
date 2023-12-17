@@ -1,9 +1,30 @@
-use crate::appstate::{LibBookInfo, LibraryJson};
-use std::fs;
+use crate::appstate::{HistoryData, HistoryEntry, LibBookInfo, LibraryJson};
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::{collections::VecDeque, fs};
 
-pub fn store_books(books: &LibraryJson) -> Result<(), anyhow::Error> {
+pub fn store_books(books: &LibraryJson) -> Result<()> {
     let json = serde_json::to_string(books)?;
     fs::write("books.json", json)?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryJson {
+    history: VecDeque<HistoryEntry>,
+}
+
+impl HistoryJson {
+    pub fn from_history(history: &HistoryData) -> HistoryJson {
+        HistoryJson {
+            history: history.history.clone(),
+        }
+    }
+}
+
+pub fn store_history(history: &HistoryJson) -> Result<()> {
+    let json = serde_json::to_string(history)?;
+    fs::write("history.json", json)?;
     Ok(())
 }
 

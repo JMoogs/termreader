@@ -1,3 +1,4 @@
+use chrono::{TimeZone, Utc};
 use ratatui::widgets::ListState;
 
 #[derive(Clone)]
@@ -142,4 +143,10 @@ impl CategoryTabs {
     pub fn in_settings(&self) -> bool {
         self.index == 4
     }
+}
+
+pub fn to_datetime(timestamp_secs: u64) -> String {
+    let dt = Utc.timestamp_opt(timestamp_secs as i64, 0).unwrap();
+
+    dt.format("%H:%M, %d/%m ").to_string()
 }

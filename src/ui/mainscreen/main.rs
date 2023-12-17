@@ -1,5 +1,6 @@
 use crate::{
     appstate::{AppState, CurrentScreen, LibraryOptions, SourceOptions},
+    helpers::to_datetime,
     ui::mainscreen::bookoptions::{
         render_local_selection, render_mv_category_box, render_type_box,
     },
@@ -45,7 +46,7 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
         0 => render_lib(chunks[1], app_state, f),
         1 => render_updates(chunks[1], f),
         2 => render_sources(chunks[1], app_state, f),
-        3 => render_history(chunks[1], f),
+        3 => render_history(chunks[1], app_state, f),
         4 => render_settings(chunks[1], f),
         _ => unreachable!(),
     };
@@ -222,6 +223,47 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     }
 }
 
-fn render_history(_rect: Rect, _f: &mut Frame) {}
+fn render_history(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(3)])
+        .split(rect);
+
+    let display_data: Vec<ListItem> = app_state
+        .history_data
+        .history
+        .clone()
+        .into_iter()
+        .map(|s| {
+            if s.chapter == 0 {
+                format!(
+                    "{} | {}",
+                    s.book.get_source_data().get_name(),
+                    to_datetime(s.timestamp)
+                )
+            } else {
+                format!(
+                    "{} | Chapter {} | {}",
+                    s.book.get_source_data().get_name(),
+                    s.chapter,
+                    to_datetime(s.timestamp)
+                )
+            }
+        })
+        .map(|f| ListItem::new(f).style(UNSELECTED_STYLE))
+        .collect();
+
+    let history = List::new(display_data)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("History")
+                .border_type(BorderType::Rounded),
+        )
+        .highlight_style(SELECTED_STYLE)
+        .highlight_symbol("> ");
+
+    f.render_stateful_widget(history, chunks[0], &mut app_state.history_data.selected);
+}
 
 fn render_settings(_rect: Rect, _f: &mut Frame) {}
