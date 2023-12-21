@@ -21,14 +21,15 @@ pub fn get_html<T: reqwest::IntoUrl>(url: T) -> Result<String> {
     };
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum NovelStatus {
     Ongoing,
     Completed,
+    #[default]
     Unknown,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 pub struct Novel {
     pub source: SourceID,
     pub source_name: String,
@@ -96,7 +97,9 @@ impl NovelPreview {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(
+    Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug, Serialize, Deserialize,
+)]
 pub struct SourceID(usize);
 
 impl SourceID {

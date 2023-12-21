@@ -7,15 +7,10 @@ use crate::helpers::StatefulList;
 
 use super::freewebnovel::FreeWebNovelScraper;
 use super::madara::{MadaraPaths, MadaraScraper};
-use super::{ChapterPreview, Novel, NovelPreview, Scrape, SourceID};
+use super::{Novel, NovelPreview, Scrape, SourceID};
 
 pub struct SourceData {
     pub sources: StatefulList<Source>,
-    pub novel_results: StatefulList<NovelPreview>,
-    pub current_novel: Option<Novel>,
-    pub current_novel_scroll: usize,
-    pub current_novel_chaps: StatefulList<ChapterPreview>,
-    pub current_book_ui_option: SourceBookBox,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -70,8 +65,9 @@ impl Scrape for Source {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum SourceBookBox {
+    #[default]
     Options,
     Chapters,
     Summary,
@@ -178,14 +174,7 @@ impl SourceData {
         let mut sources = StatefulList::with_items(v);
         sources.state.select(Some(0));
 
-        Self {
-            sources,
-            novel_results: StatefulList::new(),
-            current_novel: None,
-            current_novel_scroll: 0,
-            current_novel_chaps: StatefulList::new(),
-            current_book_ui_option: SourceBookBox::Options,
-        }
+        Self { sources }
     }
 
     pub fn get_list(&mut self) -> &StatefulList<Source> {

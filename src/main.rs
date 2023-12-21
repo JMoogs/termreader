@@ -1,5 +1,5 @@
 use crate::helpers::StatefulList;
-use appstate::{AppState, BookInfo, CurrentScreen, SourceOptions};
+use appstate::{AppState, BookInfo, CurrentScreen, MiscOptions, SourceOptions};
 
 use crossterm::{
     event::{self, Event},
@@ -79,20 +79,30 @@ fn run_app<B: Backend>(
             if let Ok(data) = app_state.channels.reciever.recv() {
                 match data {
                     appstate::RequestData::SearchResults(res) => {
-                        app_state.source_data.novel_results = StatefulList::with_items(res?);
+                        app_state.buffer.novel_previews = StatefulList::with_items(res?);
                         app_state
                             .update_screen(CurrentScreen::Sources(SourceOptions::SearchResults));
                     }
                     appstate::RequestData::BookInfo(res) => {
                         let res = res?;
-                        app_state.source_data.current_novel_chaps =
+                        app_state.buffer.clear_novel();
+                        app_state.buffer.chapter_previews =
                             StatefulList::with_items(res.chapters.clone());
-                        app_state.source_data.current_novel = Some(res);
+                        app_state.buffer.novel = Some(res);
 
                         app_state.update_screen(CurrentScreen::Sources(SourceOptions::BookView));
                     }
+                    appstate::RequestData::BookInfoNoOpts(res) => {
+                        let res = res?;
+                        app_state.buffer.clear_novel();
+                        app_state.buffer.chapter_previews =
+                            StatefulList::with_items(res.chapters.clone());
+                        app_state.buffer.novel = Some(res);
+
+                        app_state.update_screen(CurrentScreen::Misc(MiscOptions::ChapterView));
+                    }
                     appstate::RequestData::ChapterTemp((res, ch_no)) => {
-                        let novel = app_state.source_data.current_novel.clone().unwrap();
+                        let novel = app_state.buffer.novel.clone().unwrap();
                         app_state.move_to_reader(
                             BookInfo::from_novel_temp(novel, ch_no)?,
                             Some(ch_no),

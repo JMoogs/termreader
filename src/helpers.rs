@@ -1,7 +1,7 @@
 use chrono::{TimeZone, Utc};
 use ratatui::widgets::ListState;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StatefulList<T> {
     pub state: ListState,
     pub items: Vec<T>,
@@ -148,5 +148,5 @@ impl CategoryTabs {
 pub fn to_datetime(timestamp_secs: u64) -> String {
     let dt = Utc.timestamp_opt(timestamp_secs as i64, 0).unwrap();
 
-    dt.format("%d/%m/%y %H:%M").to_string()
+    dt.format("%d/%m/%y, %H:%M").to_string()
 }

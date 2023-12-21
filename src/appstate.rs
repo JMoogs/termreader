@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::SystemTime;
 
+use crate::global::sources::source_data::SourceBookBox;
 use crate::global::sources::{Chapter, ChapterPreview, NovelPreview, SourceID};
 use crate::reader::buffer::{BookProgress, BookProgressData};
 use crate::reader::ReaderData;
@@ -25,9 +26,37 @@ pub struct AppState {
     pub history_data: HistoryData,
     pub menu_options: MenuOptions,
     pub source_data: SourceData,
-    /// A buffer to store any text that may be typed by the user.
-    pub text_buffer: String,
+    /// Buffers to store any temp data.
+    pub buffer: AppBuffer,
     pub channels: ChannelData,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct AppBuffer {
+    pub text: String,
+    pub novel_previews: StatefulList<NovelPreview>,
+    pub chapter_previews: StatefulList<ChapterPreview>,
+    pub novel: Option<Novel>,
+    pub novel_preview_scroll: usize,
+    pub novel_preview_selection: SourceBookBox,
+}
+
+impl AppBuffer {
+    pub fn clear(&mut self) {
+        let _ = std::mem::replace(self, AppBuffer::default());
+    }
+
+    pub fn clear_novel(&mut self) {
+        self.chapter_previews = StatefulList::new();
+        self.novel = None;
+        self.novel_preview_scroll = 0;
+        self.novel_preview_selection = SourceBookBox::Options;
+    }
+
+    pub fn ch_list_setup(&mut self) {
+        self.clear();
+        self.novel_preview_selection = SourceBookBox::Chapters;
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +92,7 @@ impl ChannelData {
 pub enum RequestData {
     SearchResults(Result<Vec<NovelPreview>>),
     BookInfo(Result<Novel>),
+    BookInfoNoOpts(Result<Novel>),
     ChapterTemp((Result<Chapter>, usize)),
     Chapter((Result<Chapter>, usize)),
 }
@@ -70,6 +100,8 @@ pub enum RequestData {
 pub struct MenuOptions {
     pub local_options: StatefulList<String>,
     pub global_options: StatefulList<String>,
+    pub local_history_options: StatefulList<String>,
+    pub global_history_options: StatefulList<String>,
     pub category_moves: StatefulList<String>,
     pub source_options: StatefulList<String>,
     pub source_book_options: StatefulList<String>,
@@ -94,6 +126,17 @@ impl MenuOptions {
             String::from("Remove book from library"),
         ]);
 
+        let local_history_options = StatefulList::with_items(vec![
+            String::from("Continue reading"),
+            String::from("Remove from history"),
+        ]);
+
+        let global_history_options = StatefulList::with_items(vec![
+            String::from("Continue reading"),
+            String::from("View book"),
+            String::from("Remove from history"),
+        ]);
+
         let category_moves = StatefulList::with_items(categories);
 
         let source_options =
@@ -108,6 +151,8 @@ impl MenuOptions {
         Self {
             local_options,
             global_options,
+            local_history_options,
+            global_history_options,
             category_moves,
             source_options,
             source_book_options,
@@ -133,6 +178,11 @@ impl AppState {
             self.prev_screens.push(self.current_screen);
         }
         self.current_screen = new;
+    }
+
+    pub fn to_history_screen(&mut self) {
+        self.prev_screens = Vec::new();
+        self.current_screen = CurrentScreen::History(HistoryOptions::Default);
     }
 
     pub fn to_lib_screen(&mut self) {
@@ -171,7 +221,7 @@ impl AppState {
             reader_data: None,
             menu_options: MenuOptions::new(cats),
             source_data: SourceData::build(),
-            text_buffer: String::new(),
+            buffer: AppBuffer::default(),
             channels: ChannelData::new(),
         })
     }
@@ -251,6 +301,14 @@ impl AppState {
         self.menu_options.global_options.state.select(Some(0));
         self.menu_options.local_options.state.select(Some(0));
         self.menu_options.source_options.state.select(Some(0));
+        self.menu_options
+            .local_history_options
+            .state
+            .select(Some(0));
+        self.menu_options
+            .global_history_options
+            .state
+            .select(Some(0));
     }
 }
 
@@ -260,15 +318,6 @@ pub struct LibraryData {
     pub books: HashMap<String, StatefulList<LibBookInfo>>,
     pub default_category_name: String,
     pub categories: CategoryTabs,
-    pub menu_data: LibMenuData,
-}
-
-#[derive(Clone)]
-pub struct LibMenuData {
-    pub ch_scroll: usize,
-    /// When true, the chapter tab is selected. When false, the synopsis is selected.
-    pub ch_selected: bool,
-    pub ch_list: Option<StatefulList<ChapterPreview>>,
 }
 
 impl LibraryData {
@@ -458,11 +507,6 @@ impl From<LibraryJson> for LibraryData {
             books: map,
             categories,
             default_category_name,
-            menu_data: LibMenuData {
-                ch_scroll: 0,
-                ch_selected: true,
-                ch_list: None,
-            },
         }
     }
 }
@@ -470,6 +514,7 @@ impl From<LibraryJson> for LibraryData {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum CurrentScreen {
     // Main(MenuType),
+    Misc(MiscOptions),
     Library(LibraryOptions),
     Updates(UpdateOptions),
     Sources(SourceOptions),
@@ -501,12 +546,16 @@ impl CurrentScreen {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum MiscOptions {
+    ChapterView,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum LibraryOptions {
     Default,
     LocalBookSelect,
     GlobalBookSelect,
     MoveCategorySelect,
-    ChapterView,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
@@ -525,7 +574,8 @@ pub enum SourceOptions {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum HistoryOptions {
     Default,
-    HistoryBookOptions,
+    HistoryLocalBookOptions,
+    HistoryGlobalBookOptions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
@@ -633,6 +683,20 @@ impl BookInfo {
         }
     }
 
+    pub fn get_progress(&self) -> BookProgress {
+        let source_data = self.get_source_data();
+        match source_data {
+            BookSource::Local(ref data) => data.progress.progress,
+            BookSource::Global(d) => {
+                let p = d.chapter_progress.get(&d.current_chapter);
+                match p {
+                    Some(place) => place.progress,
+                    None => BookProgress::Location((0, 0)),
+                }
+            }
+        }
+    }
+
     pub fn get_source_data_mut(&mut self) -> &mut BookSource {
         match self {
             BookInfo::Library(d) => &mut d.source_data,
@@ -735,7 +799,7 @@ impl LibBookInfo {
         matches!(self.source_data, BookSource::Local(_))
     }
 
-    /// Creates an instance of `BookInfo` from a path to a local source file.
+    /// Creates an instance of `LibBookInfo` from a path to a local source file.
     pub fn from_local(
         path: impl Into<String>,
         category: Option<String>,
@@ -763,7 +827,7 @@ impl LibBookInfo {
         })
     }
 
-    /// Creates an instance of `BookInfo`.
+    /// Creates an instance of `LibBookInfo`.
     pub fn new(source_data: BookSource, category: Option<String>) -> Self {
         Self {
             name: source_data.get_name(),

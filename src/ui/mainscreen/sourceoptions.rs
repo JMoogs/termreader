@@ -43,8 +43,8 @@ pub fn render_search_results(
     block_text: &str,
 ) {
     let display: Vec<ListItem> = app_state
-        .source_data
-        .novel_results
+        .buffer
+        .novel_previews
         .items
         .iter()
         .map(|f| ListItem::new(f.name.clone()).style(UNSELECTED_STYLE))
@@ -60,11 +60,7 @@ pub fn render_search_results(
         .highlight_style(SELECTED_STYLE)
         .highlight_symbol("> ");
 
-    f.render_stateful_widget(
-        results,
-        rect,
-        &mut app_state.source_data.novel_results.state,
-    );
+    f.render_stateful_widget(results, rect, &mut app_state.buffer.novel_previews.state);
 }
 
 pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
@@ -89,7 +85,7 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
         .split(chunks_horiz[1]);
 
-    let novel = app_state.source_data.current_novel.as_ref().unwrap();
+    let novel = app_state.buffer.novel.as_ref().unwrap();
 
     // The title
     let title = Paragraph::new(novel.name.clone())
@@ -111,16 +107,16 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
         .border_type(BorderType::Rounded)
         .style(SELECTED_STYLE);
     // Synopsis
-    let synopsis = if app_state.source_data.current_book_ui_option == SourceBookBox::Summary {
+    let synopsis = if app_state.buffer.novel_preview_selection == SourceBookBox::Summary {
         Paragraph::new(novel.synopsis())
             .block(selected_block)
             .wrap(Wrap { trim: true })
-            .scroll((app_state.source_data.current_novel_scroll as u16, 0))
+            .scroll((app_state.buffer.novel_preview_scroll as u16, 0))
     } else {
         Paragraph::new(novel.synopsis())
             .block(unselected_block)
             .wrap(Wrap { trim: true })
-            .scroll((app_state.source_data.current_novel_scroll as u16, 0))
+            .scroll((app_state.buffer.novel_preview_scroll as u16, 0))
     };
 
     f.render_widget(synopsis, chunks_horiz[0]);
@@ -144,7 +140,7 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
         .map(|i| ListItem::new(i).style(UNSELECTED_STYLE))
         .collect();
 
-    let display = if app_state.source_data.current_book_ui_option == SourceBookBox::Options {
+    let display = if app_state.buffer.novel_preview_selection == SourceBookBox::Options {
         List::new(list)
             .block(selected_block)
             .highlight_style(SELECTED_STYLE)
@@ -164,12 +160,7 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
 
     // Chapters
 
-    let chapters = app_state
-        .source_data
-        .current_novel
-        .clone()
-        .unwrap()
-        .chapters;
+    let chapters = app_state.buffer.novel.clone().unwrap().chapters;
 
     let list: Vec<ListItem> = chapters
         .into_iter()
@@ -189,7 +180,7 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
         .border_type(BorderType::Rounded)
         .style(SELECTED_STYLE);
 
-    let display = if app_state.source_data.current_book_ui_option == SourceBookBox::Chapters {
+    let display = if app_state.buffer.novel_preview_selection == SourceBookBox::Chapters {
         List::new(list)
             .block(selected_block)
             .highlight_style(SELECTED_STYLE)
@@ -204,6 +195,6 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
     f.render_stateful_widget(
         display,
         chunks_vert_2[1],
-        &mut app_state.source_data.current_novel_chaps.state,
+        &mut app_state.buffer.chapter_previews.state,
     );
 }

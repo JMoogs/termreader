@@ -1,5 +1,7 @@
 use crate::{
-    appstate::{AppState, CurrentScreen, LibraryOptions, SourceOptions},
+    appstate::{
+        AppState, CurrentScreen, HistoryOptions, LibraryOptions, MiscOptions, SourceOptions,
+    },
     helpers::to_datetime,
     ui::mainscreen::bookoptions::{
         render_local_selection, render_mv_category_box, render_type_box,
@@ -10,7 +12,10 @@ use crate::{
 use ratatui::{prelude::*, widgets::*};
 
 use super::{
-    bookoptions::{render_global_selection, render_lib_ch_list},
+    bookoptions::{
+        render_ch_list, render_global_selection, render_global_selection_history,
+        render_local_selection_history,
+    },
     sourceoptions::{render_search_results, render_source_book},
 };
 
@@ -29,9 +34,9 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
     }
     if matches!(
         app_state.current_screen,
-        CurrentScreen::Library(LibraryOptions::ChapterView)
+        CurrentScreen::Misc(MiscOptions::ChapterView)
     ) {
-        render_lib_ch_list(app_state, f);
+        render_ch_list(app_state, f);
         return;
     }
 
@@ -264,6 +269,17 @@ fn render_history(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         .highlight_symbol("> ");
 
     f.render_stateful_widget(history, chunks[0], &mut app_state.history_data.selected);
+
+    // Menu boxes
+    if let CurrentScreen::History(HistoryOptions::HistoryLocalBookOptions) =
+        app_state.current_screen
+    {
+        render_local_selection_history(rect, app_state, f);
+    } else if let CurrentScreen::History(HistoryOptions::HistoryGlobalBookOptions) =
+        app_state.current_screen
+    {
+        render_global_selection_history(rect, app_state, f);
+    }
 }
 
 fn render_settings(_rect: Rect, _f: &mut Frame) {}
