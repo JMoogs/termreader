@@ -65,7 +65,7 @@ pub fn handle_controls(app_state: &mut AppState, event: event::KeyCode) -> Resul
             }
             HistoryOptions::HistoryGlobalBookOptions => {
                 control_history_global_book_select(app_state, event)?
-            } // HistoryOptions::HistoryBookOptions => control_history_book_select(app_state, event)?,
+            }
         },
         CurrentScreen::Settings(option) => match option {
             SettingsOptions::Default => control_main_menu(app_state, event),
