@@ -17,8 +17,8 @@ pub fn get_html<T: reqwest::IntoUrl>(url: T) -> Result<String> {
     {
         panic!("Cloudflare reached, error handling currently unimplemented.");
     } else {
-        return Ok(text);
-    };
+        Ok(text)
+    }
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -63,7 +63,7 @@ impl Novel {
                 return Some(ch.url.clone());
             }
         }
-        return None;
+        None
     }
 }
 

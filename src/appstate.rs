@@ -43,7 +43,7 @@ pub struct AppBuffer {
 
 impl AppBuffer {
     pub fn clear(&mut self) {
-        let _ = std::mem::replace(self, AppBuffer::default());
+        let _ = std::mem::take(self);
     }
 
     pub fn clear_novel(&mut self) {
@@ -162,7 +162,7 @@ impl MenuOptions {
 
 impl AppState {
     pub fn get_last_screen(&self) -> CurrentScreen {
-        return self.prev_screens.last().unwrap().clone();
+        return *self.prev_screens.last().unwrap();
     }
 
     pub fn update_screen(&mut self, new: CurrentScreen) {
@@ -375,7 +375,7 @@ impl LibraryData {
             list.items.remove(pos);
 
             if sel == pos {
-                if list.items.len() > 0 {
+                if !list.items.is_empty() {
                     list.state.select(Some(0));
                 } else {
                     list.state.select(None);
@@ -436,7 +436,7 @@ impl LibraryData {
         let name = &self.categories.tabs[idx];
 
         match self.books.get(name) {
-            Some(books) => return books,
+            Some(books) => books,
             None => panic!("This should never happen"),
         }
     }
@@ -447,7 +447,7 @@ impl LibraryData {
         let name = &self.categories.tabs[idx];
 
         match self.books.get_mut(name) {
-            Some(books) => return books,
+            Some(books) => books,
             None => panic!("This should never happen"),
         }
     }
@@ -534,7 +534,7 @@ impl CurrentScreen {
             | CurrentScreen::Sources(SourceOptions::Default)
             | CurrentScreen::Updates(UpdateOptions::Default)
             | CurrentScreen::History(HistoryOptions::Default)
-            | CurrentScreen::Settings(SettingsOptions::Default) => return true,
+            | CurrentScreen::Settings(SettingsOptions::Default) => true,
 
             _ => false,
         }
@@ -644,11 +644,10 @@ impl From<LibraryData> for LibraryJson {
         let entries: Vec<LibBookInfo> = value
             .books
             .into_values()
-            .map(|v| {
+            .flat_map(|v| {
                 let s: Vec<LibBookInfo> = v.into();
                 s
             })
-            .flatten()
             .collect();
         Self {
             default_category_name,
@@ -918,14 +917,14 @@ impl BookSource {
 
     pub fn get_chapter(&self) -> usize {
         match self {
-            BookSource::Local(_) => return 0,
-            BookSource::Global(d) => return d.current_chapter,
+            BookSource::Local(_) => 0,
+            BookSource::Global(d) => d.current_chapter,
         }
     }
 
     pub fn get_next_chapter(&self) -> Option<usize> {
         match self {
-            BookSource::Local(_) => return None,
+            BookSource::Local(_) => None,
             BookSource::Global(d) => {
                 let next = d.current_chapter + 1;
                 if next <= d.total_chapters {
@@ -939,12 +938,12 @@ impl BookSource {
 
     pub fn get_prev_chapter(&self) -> Option<usize> {
         match self {
-            BookSource::Local(_) => return None,
+            BookSource::Local(_) => None,
             BookSource::Global(d) => {
                 if d.current_chapter <= 1 {
-                    return None;
+                    None
                 } else {
-                    return Some(d.current_chapter - 1);
+                    Some(d.current_chapter - 1)
                 }
             }
         }

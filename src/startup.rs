@@ -28,7 +28,7 @@ pub fn load_history() -> Result<HistoryData> {
             })
         }
         Err(_) => {
-            return Ok(HistoryData {
+            Ok(HistoryData {
                 history: VecDeque::new(),
                 selected: ListState::default(),
             })

@@ -57,7 +57,7 @@ impl Scrape for FreeWebNovelScraper {
     }
 
     fn parse_novel_and_chapters(&self, novel_path: String) -> Result<Novel> {
-        let novel_url = novel_path.replace("/", "");
+        let novel_url = novel_path.replace('/', "");
         let url = format!("https://freewebnovel.com/{}.html", novel_url);
         let html = Html::parse_document(&get_html(url.clone())?);
 
@@ -179,13 +179,13 @@ impl Scrape for FreeWebNovelScraper {
         }
         let chapter_contents = chapter_contents.trim().to_string();
 
-        return Ok(Chapter {
+        Ok(Chapter {
             source: self.source_id,
             novel_url: novel_path,
             chapter_url: chapter_path,
             chapter_name,
             chapter_contents,
-        });
+        })
     }
 
     fn search_novels(&self, search_term: &str) -> Result<Vec<NovelPreview>> {
@@ -229,7 +229,7 @@ impl Scrape for FreeWebNovelScraper {
             })
         }
 
-        return Ok(novels);
+        Ok(novels)
     }
 }
 

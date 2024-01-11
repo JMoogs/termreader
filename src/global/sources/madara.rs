@@ -132,7 +132,7 @@ impl MadaraScraper {
 
             novels.push(NovelPreview::new(
                 self.source_id,
-                novel_name.into(),
+                novel_name,
                 novel_url.into(),
             ));
         }

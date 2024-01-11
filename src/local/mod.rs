@@ -52,11 +52,11 @@ impl LocalBookData {
     ///
     /// Adds 1 to get_line(), as we want to work out 1 indexed line number.
     pub fn get_progress_display(&self) -> (usize, usize, f64) {
-        return (
+        (
             self.progress.get_line() + 1,
             self.progress.get_total_lines(),
             self.progress.get_pct(),
-        );
+        )
     }
 }
 

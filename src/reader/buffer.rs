@@ -243,6 +243,12 @@ pub struct Linebreaks {
     breaks: HashMap<usize, Vec<usize>>,
 }
 
+impl Default for Linebreaks {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Linebreaks {
     pub fn new() -> Self {
         Self {
@@ -251,10 +257,10 @@ impl Linebreaks {
     }
 
     pub fn insert(&mut self, line: usize, char: usize) {
-        if self.breaks.contains_key(&line) {
-            self.breaks.get_mut(&line).unwrap().push(char);
+        if let std::collections::hash_map::Entry::Vacant(e) = self.breaks.entry(line) {
+            e.insert(vec![char]);
         } else {
-            self.breaks.insert(line, vec![char]);
+            self.breaks.get_mut(&line).unwrap().push(char);
         }
     }
 
@@ -266,12 +272,7 @@ impl Linebreaks {
     pub fn get_previous_break(&self, current: (usize, usize)) -> Option<usize> {
         let mut v = self.get_line(current.0)?.clone();
         v.sort_by(|a, b| b.partial_cmp(a).unwrap());
-        for num in v {
-            if num + 1 < current.1 {
-                return Some(num);
-            }
-        }
-        None
+        v.into_iter().find(|&num| num + 1 < current.1)
     }
 }
 
@@ -357,10 +358,10 @@ impl BookProgressData {
 
         let lines = BufReader::new(std::fs::File::open(path)?).lines().count();
 
-        return Ok(Self {
+        Ok(Self {
             total_lines: lines,
             progress,
-        });
+        })
     }
 
     #[inline]
@@ -409,16 +410,16 @@ impl BookPortion {
                         .abs_diff(lines[lines.len() - 1].len() - 1)
                         < 50
                 {
-                    return Ok(BookProgressData {
+                    Ok(BookProgressData {
                         total_lines: lines.len(),
                         progress: BookProgress::Finished,
-                    });
+                    })
                 } else {
                     // return Ok(BookProgress::Location(self.display_start));
-                    return Ok(BookProgressData {
+                    Ok(BookProgressData {
                         total_lines: lines.len(),
                         progress: BookProgress::Location(self.display_start),
-                    });
+                    })
                 }
             }
             BufferType::Local(buffer) => {
@@ -426,15 +427,15 @@ impl BookPortion {
                 let lines = BufReader::new(std::fs::File::open(file)?).lines().count();
                 // Not entirely accurate but close enough.
                 if self.display_end.0 == lines - 1 {
-                    return Ok(BookProgressData {
+                    Ok(BookProgressData {
                         total_lines: lines,
                         progress: BookProgress::Finished,
-                    });
+                    })
                 } else {
-                    return Ok(BookProgressData {
+                    Ok(BookProgressData {
                         total_lines: lines,
                         progress: BookProgress::Location(self.display_start),
-                    });
+                    })
                 }
             }
         }

@@ -20,10 +20,8 @@ pub fn handle_controls(app_state: &mut AppState, event: event::KeyCode) -> Resul
         return Ok(false);
     }
     // Go back, quitting if required.
-    if matches!(event, KeyCode::Esc) || matches!(event, KeyCode::Char('q')) {
-        if control_back(app_state)? {
-            return Ok(true);
-        }
+    if (matches!(event, KeyCode::Esc) || matches!(event, KeyCode::Char('q'))) && control_back(app_state)? {
+        return Ok(true);
     }
     // Other times when we're not inputting:
     match app_state.current_screen {
@@ -95,11 +93,11 @@ fn control_back(app_state: &mut AppState) -> Result<bool> {
     }
 
     app_state.current_screen = prev;
-    return Ok(false);
+    Ok(false)
 }
 
 fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow::Error> {
-    Ok(match event {
+    match event {
         KeyCode::Backspace => {
             app_state.buffer.text.pop();
         }
@@ -141,7 +139,8 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
             app_state.buffer.text = String::new();
         }
         _ => (),
-    })
+    };
+    Ok(())
 }
 
 fn control_main_menu(app_state: &mut AppState, event: event::KeyCode) {
@@ -553,10 +552,8 @@ fn control_chapter_view(app_state: &mut AppState, event: event::KeyCode) -> Resu
         KeyCode::Up => {
             if app_state.buffer.novel_preview_selection == SourceBookBox::Chapters {
                 app_state.buffer.chapter_previews.previous();
-            } else {
-                if app_state.buffer.novel_preview_scroll != 0 {
-                    app_state.buffer.novel_preview_scroll -= 1;
-                }
+            } else if app_state.buffer.novel_preview_scroll != 0 {
+                app_state.buffer.novel_preview_scroll -= 1;
             }
         }
         KeyCode::Down => {
