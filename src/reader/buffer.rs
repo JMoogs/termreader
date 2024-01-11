@@ -143,6 +143,8 @@ impl LocalBuffer {
         let reader = BufReader::new(file);
 
         let buf_lines = if lines > self.buffer_start_line {
+            // This is required for both clauses to be of the same type.
+            #[allow(clippy::iter_skip_zero)]
             reader.lines().skip(0)
         } else {
             reader.lines().skip(self.buffer_start_line - lines)
