@@ -20,7 +20,9 @@ pub fn handle_controls(app_state: &mut AppState, event: event::KeyCode) -> Resul
         return Ok(false);
     }
     // Go back, quitting if required.
-    if (matches!(event, KeyCode::Esc) || matches!(event, KeyCode::Char('q'))) && control_back(app_state)? {
+    if (matches!(event, KeyCode::Esc) || matches!(event, KeyCode::Char('q')))
+        && control_back(app_state)?
+    {
         return Ok(true);
     }
     // Other times when we're not inputting:
@@ -307,11 +309,13 @@ fn control_history_menu(app_state: &mut AppState, event: event::KeyCode) -> Resu
 fn control_library_menu(app_state: &mut AppState, event: event::KeyCode) -> Result<()> {
     match event {
         KeyCode::Char('}') | KeyCode::Right => {
+            // Possibly redundant, needs testing
             if app_state.current_main_tab.in_library() {
                 app_state.library_data.categories.next();
             }
         }
         KeyCode::Char('{') | KeyCode::Left => {
+            // Possibly redundant, needs testing
             if app_state.current_main_tab.in_library() {
                 app_state.library_data.categories.previous();
             }
@@ -336,6 +340,9 @@ fn control_library_menu(app_state: &mut AppState, event: event::KeyCode) -> Resu
                         .update_screen(CurrentScreen::Library(LibraryOptions::GlobalBookSelect));
                 }
             }
+        }
+        KeyCode::Char('c') => {
+            // Opens a menu in which you can create / delete / reorder categories
         }
         _ => (),
     }
