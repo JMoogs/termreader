@@ -13,12 +13,20 @@ use anyhow::Result;
 use crossterm::event::{self, KeyCode};
 use ratatui::widgets::ListState;
 
-pub fn handle_controls(app_state: &mut AppState, event: event::KeyCode) -> Result<bool> {
+pub fn handle_controls(app_state: &mut AppState, mut event: event::KeyCode) -> Result<bool> {
     // On the rename screen, we just want to append to the string
     if matches!(app_state.current_screen, CurrentScreen::Typing) {
         handle_typing(event, app_state)?;
         return Ok(false);
     }
+    // Aliased keys can be set here:
+    event = match event {
+        KeyCode::Char('h') => KeyCode::Left,
+        KeyCode::Char('j') => KeyCode::Down,
+        KeyCode::Char('k') => KeyCode::Up,
+        KeyCode::Char('l') => KeyCode::Right,
+        x => x,
+    };
     // Go back, quitting if required.
     if (matches!(event, KeyCode::Esc) || matches!(event, KeyCode::Char('q')))
         && control_back(app_state)?
