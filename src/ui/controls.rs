@@ -41,7 +41,8 @@ pub fn handle_controls(app_state: &mut AppState, event: event::KeyCode) -> Resul
             LibraryOptions::GlobalBookSelect => {
                 control_library_global_book_select(app_state, event)?
             }
-            LibraryOptions::MoveCategorySelect => control_library_move_category(app_state, event),
+            LibraryOptions::CategorySelect => control_library_category_select(app_state, event),
+            LibraryOptions::CategoryOptions => control_library_category_options(app_state, event),
         },
         CurrentScreen::Updates(option) => match option {
             UpdateOptions::Default => control_main_menu(app_state, event),
@@ -124,6 +125,28 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
                         .library_data
                         .rename_book(book.id, app_state.buffer.text.clone());
                     app_state.to_lib_screen();
+                }
+                CurrentScreen::Library(LibraryOptions::CategoryOptions) => {
+                    app_state
+                        .library_data
+                        .create_category(app_state.buffer.text.clone());
+                    app_state.update_category_list();
+                    app_state.to_lib_screen();
+                }
+                CurrentScreen::Library(LibraryOptions::CategorySelect) => {
+                    app_state.library_data.rename_category(
+                        app_state
+                            .menu_options
+                            .category_list
+                            .selected()
+                            .unwrap()
+                            .clone(),
+                        app_state.buffer.text.clone(),
+                    );
+                    app_state.update_category_list();
+                    app_state.to_lib_screen();
+                    app_state
+                        .update_screen(CurrentScreen::Library(LibraryOptions::CategoryOptions));
                 }
                 CurrentScreen::Sources(SourceOptions::SourceSelect) => {
                     app_state.channels.loading = true;
@@ -343,6 +366,13 @@ fn control_library_menu(app_state: &mut AppState, event: event::KeyCode) -> Resu
         }
         KeyCode::Char('c') => {
             // Opens a menu in which you can create / delete / reorder categories
+            // Select the first option upon entering
+            app_state
+                .menu_options
+                .category_options
+                .state
+                .select(Some(0));
+            app_state.update_screen(CurrentScreen::Library(LibraryOptions::CategoryOptions))
         }
         _ => (),
     }
@@ -377,8 +407,7 @@ fn control_library_local_book_select(
                 }
                 1 => {
                     // Move to category
-                    app_state
-                        .update_screen(CurrentScreen::Library(LibraryOptions::MoveCategorySelect));
+                    app_state.update_screen(CurrentScreen::Library(LibraryOptions::CategorySelect));
                 }
                 2 => {
                     // Rename book
@@ -482,8 +511,9 @@ fn control_library_global_book_select(
                     app_state.update_screen(CurrentScreen::Misc(MiscOptions::ChapterView));
                 }
                 // Move Category
-                2 => app_state
-                    .update_screen(CurrentScreen::Library(LibraryOptions::MoveCategorySelect)),
+                2 => {
+                    app_state.update_screen(CurrentScreen::Library(LibraryOptions::CategorySelect))
+                }
                 // Rename
                 3 => {
                     app_state.update_screen(CurrentScreen::Typing);
@@ -527,29 +557,90 @@ fn control_library_global_book_select(
     Ok(())
 }
 
-fn control_library_move_category(app_state: &mut AppState, event: event::KeyCode) {
+fn control_library_category_select(app_state: &mut AppState, event: event::KeyCode) {
     match event {
-        KeyCode::Up => app_state.menu_options.category_moves.previous(),
-        KeyCode::Down => app_state.menu_options.category_moves.next(),
+        KeyCode::Up => app_state.menu_options.category_list.previous(),
+        KeyCode::Down => app_state.menu_options.category_list.next(),
         KeyCode::Enter => {
-            let book = app_state
-                .library_data
-                .get_category_list()
-                .selected()
-                .unwrap()
-                .id;
+            if app_state.get_last_screen()
+                == CurrentScreen::Library(LibraryOptions::CategoryOptions)
+            {
+                let opt = app_state
+                    .menu_options
+                    .category_options
+                    .state
+                    .selected()
+                    .unwrap();
 
-            let category = app_state
-                .menu_options
-                .category_moves
-                .selected()
-                .unwrap()
-                .clone();
+                if opt == 2 {
+                    // Rename
+                    app_state.update_screen(CurrentScreen::Typing)
+                } else if opt == 3 {
+                    // Delete
+                    app_state.library_data.delete_category(
+                        app_state
+                            .menu_options
+                            .category_list
+                            .selected()
+                            .unwrap()
+                            .clone(),
+                    );
+                    app_state.menu_options.category_list.state.select(Some(0));
+                    app_state.update_category_list();
+                    app_state.to_lib_screen();
+                    app_state
+                        .update_screen(CurrentScreen::Library(LibraryOptions::CategoryOptions));
+                } else {
+                    unreachable!();
+                }
+            } else {
+                let book = app_state
+                    .library_data
+                    .get_category_list()
+                    .selected()
+                    .unwrap()
+                    .id;
 
-            app_state.library_data.move_category(book, Some(category));
+                let category = app_state
+                    .menu_options
+                    .category_list
+                    .selected()
+                    .unwrap()
+                    .clone();
 
-            app_state.to_lib_screen();
+                app_state.library_data.move_category(book, Some(category));
+
+                app_state.to_lib_screen();
+            }
         }
+        _ => (),
+    }
+}
+
+fn control_library_category_options(app_state: &mut AppState, event: event::KeyCode) {
+    match event {
+        KeyCode::Up => app_state.menu_options.category_options.previous(),
+        KeyCode::Down => app_state.menu_options.category_options.next(),
+        KeyCode::Enter => {
+            let choice = app_state
+                .menu_options
+                .category_options
+                .state
+                .selected()
+                .unwrap();
+            match choice {
+                // Create a category
+                0 => app_state.update_screen(CurrentScreen::Typing),
+                // Reorder categories
+                1 => (),
+                // Rename & delete
+                2 | 3 => {
+                    app_state.update_screen(CurrentScreen::Library(LibraryOptions::CategorySelect))
+                }
+                _ => unreachable!(),
+            }
+        }
+
         _ => (),
     }
 }

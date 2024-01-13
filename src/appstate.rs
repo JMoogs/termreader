@@ -102,9 +102,10 @@ pub struct MenuOptions {
     pub global_options: StatefulList<String>,
     pub local_history_options: StatefulList<String>,
     pub global_history_options: StatefulList<String>,
-    pub category_moves: StatefulList<String>,
+    pub category_list: StatefulList<String>,
     pub source_options: StatefulList<String>,
     pub source_book_options: StatefulList<String>,
+    pub category_options: StatefulList<String>,
 }
 
 impl MenuOptions {
@@ -137,7 +138,7 @@ impl MenuOptions {
             String::from("Remove from history"),
         ]);
 
-        let category_moves = StatefulList::with_items(categories);
+        let category_list = StatefulList::with_items(categories);
 
         let source_options =
             StatefulList::with_items(vec![String::from("Search"), String::from("View popular")]);
@@ -148,14 +149,22 @@ impl MenuOptions {
             // String::from("View chapters"),
         ]);
 
+        let category_options = StatefulList::with_items(vec![
+            String::from("Create categories"),
+            String::from("Re-order categories (Not yet implemented)"),
+            String::from("Rename categories"),
+            String::from("Delete categories"),
+        ]);
+
         Self {
             local_options,
             global_options,
             local_history_options,
             global_history_options,
-            category_moves,
+            category_list,
             source_options,
             source_book_options,
+            category_options,
         }
     }
 }
@@ -195,6 +204,11 @@ impl AppState {
         self.current_screen = CurrentScreen::Sources(SourceOptions::Default);
     }
 
+    pub fn update_category_list(&mut self) {
+        self.menu_options.category_list =
+            StatefulList::with_items(self.library_data.categories.items.clone());
+    }
+
     pub fn build() -> Result<Self, anyhow::Error> {
         let lib_info = startup::load_books()?;
         let library_data = LibraryData::from(lib_info);
@@ -204,7 +218,7 @@ impl AppState {
             history_data.selected.select(Some(0));
         }
 
-        let cats = library_data.categories.tabs.clone();
+        let cats = library_data.categories.items.clone();
 
         Ok(Self {
             current_screen: CurrentScreen::Library(LibraryOptions::Default),
@@ -317,7 +331,7 @@ pub struct LibraryData {
     // This string contains the category name, and the stateful list contains all books under the aforementioned category.
     pub books: HashMap<String, StatefulList<LibBookInfo>>,
     pub default_category_name: String,
-    pub categories: CategoryTabs,
+    pub categories: StatefulList<String>,
 }
 
 impl LibraryData {
@@ -329,7 +343,58 @@ impl LibraryData {
     }
 
     pub fn create_category(&mut self, name: String) {
-        self.books.insert(name, StatefulList::new());
+        // Don't allow two categories with the same name.
+        if self.books.contains_key(&name) {
+            return;
+        }
+
+        self.books.insert(name.clone(), StatefulList::new());
+        self.categories.items.push(name)
+    }
+
+    pub fn rename_category(&mut self, old_name: String, new_name: String) {
+        if let Some(v) = self.books.remove(&old_name) {
+            if self.default_category_name == old_name {
+                self.default_category_name = new_name.clone();
+            }
+
+            let pos = self
+                .categories
+                .items
+                .iter()
+                .position(|r| r == &old_name)
+                .unwrap();
+
+            self.categories.items.remove(pos);
+            self.categories.items.insert(pos, new_name.clone());
+
+            self.books.insert(new_name, v);
+        }
+    }
+
+    pub fn delete_category(&mut self, name: String) {
+        // Don't allow the user to delete the default category: it can only be renamed.
+        if self.default_category_name == name {
+            return;
+        }
+
+        if let Some(mut v) = self.books.remove(&name) {
+            let pos = self
+                .categories
+                .items
+                .iter()
+                .position(|r| r == &name)
+                .unwrap();
+            // If the category being deleted is removed, set the selection to the first category, that will always exist.
+            if pos == self.categories.state.selected().unwrap() {
+                self.categories.state.select(Some(0))
+            }
+            self.categories.items.remove(pos);
+
+            let default_list = self.books.get_mut(&self.default_category_name).unwrap();
+
+            default_list.items.append(&mut v.items)
+        }
     }
 
     pub fn add_book(&mut self, mut book: LibBookInfo, category: Option<String>) {
@@ -431,9 +496,9 @@ impl LibraryData {
     }
 
     pub fn get_category_list(&self) -> &StatefulList<LibBookInfo> {
-        let idx = self.categories.index;
+        let idx = self.categories.state.selected().unwrap();
 
-        let name = &self.categories.tabs[idx];
+        let name = &self.categories.items[idx];
 
         match self.books.get(name) {
             Some(books) => books,
@@ -442,9 +507,9 @@ impl LibraryData {
     }
 
     pub fn get_category_list_mut(&mut self) -> &mut StatefulList<LibBookInfo> {
-        let idx = self.categories.index;
+        let idx = self.categories.state.selected().unwrap();
 
-        let name = &self.categories.tabs[idx];
+        let name = &self.categories.items[idx];
 
         match self.books.get_mut(name) {
             Some(books) => books,
@@ -501,7 +566,7 @@ impl From<LibraryJson> for LibraryData {
         }
 
         value.categories.insert(0, value.default_category_name);
-        let categories = CategoryTabs::with_tabs(value.categories);
+        let categories = StatefulList::with_items(value.categories);
 
         LibraryData {
             books: map,
@@ -555,7 +620,8 @@ pub enum LibraryOptions {
     Default,
     LocalBookSelect,
     GlobalBookSelect,
-    MoveCategorySelect,
+    CategorySelect,
+    CategoryOptions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
@@ -633,7 +699,7 @@ impl LibraryJson {
 impl From<LibraryData> for LibraryJson {
     fn from(value: LibraryData) -> Self {
         let default_category_name = value.default_category_name;
-        let categories = value.categories.tabs;
+        let categories = value.categories.items;
 
         // Don't add the default
         let categories = categories

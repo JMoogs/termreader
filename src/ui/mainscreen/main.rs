@@ -4,7 +4,7 @@ use crate::{
     },
     helpers::to_datetime,
     ui::mainscreen::bookoptions::{
-        render_local_selection, render_mv_category_box, render_type_box,
+        render_category_box, render_category_options, render_local_selection, render_type_box,
     },
     ui::{mainscreen::sourceoptions::render_source_selection, render_loading_popup},
     SELECTED_STYLE, UNSELECTED_STYLE,
@@ -98,7 +98,7 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     let categories: Vec<Line> = app_state
         .library_data
         .categories
-        .tabs
+        .items
         .clone()
         .into_iter()
         .map(|t| Line::from(t).alignment(Alignment::Center))
@@ -111,7 +111,7 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
                 .title("Categories")
                 .border_type(BorderType::Rounded),
         )
-        .select(app_state.library_data.categories.index)
+        .select(app_state.library_data.categories.state.selected().unwrap())
         .style(UNSELECTED_STYLE)
         .highlight_style(SELECTED_STYLE);
 
@@ -162,18 +162,23 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     f.render_widget(commands, chunks[2]);
 
     // Render a centered box on top if in certain menus.
-    if let CurrentScreen::Library(LibraryOptions::LocalBookSelect) = app_state.current_screen {
-        render_local_selection(rect, app_state, f);
-    } else if let CurrentScreen::Library(LibraryOptions::GlobalBookSelect) =
-        app_state.current_screen
-    {
-        render_global_selection(rect, app_state, f);
-    } else if let CurrentScreen::Typing = app_state.current_screen {
-        render_type_box(rect, app_state, f);
-    } else if let CurrentScreen::Library(LibraryOptions::MoveCategorySelect) =
-        app_state.current_screen
-    {
-        render_mv_category_box(chunks[1], app_state, f)
+    match app_state.current_screen {
+        CurrentScreen::Library(LibraryOptions::LocalBookSelect) => {
+            render_local_selection(rect, app_state, f);
+        }
+        CurrentScreen::Library(LibraryOptions::GlobalBookSelect) => {
+            render_global_selection(rect, app_state, f);
+        }
+        CurrentScreen::Typing => {
+            render_type_box(rect, app_state, f);
+        }
+        CurrentScreen::Library(LibraryOptions::CategorySelect) => {
+            render_category_box(chunks[1], app_state, f)
+        }
+        CurrentScreen::Library(LibraryOptions::CategoryOptions) => {
+            render_category_options(rect, app_state, f)
+        }
+        _ => (),
     }
 }
 
