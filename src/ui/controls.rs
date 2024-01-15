@@ -5,6 +5,7 @@ use crate::{
         AppState, BookInfo, BookSource, CurrentScreen, HistoryOptions, LibBookInfo, LibraryOptions,
         MiscOptions, RequestData, SettingsOptions, SourceOptions, UpdateOptions,
     },
+    commands::{parse_command, run_command},
     global::sources::{source_data::SourceBookBox, Scrape, SortOrder},
     helpers::StatefulList,
     reader::buffer::BookProgress,
@@ -14,6 +15,13 @@ use crossterm::event::{self, KeyCode};
 use ratatui::widgets::ListState;
 
 pub fn handle_controls(app_state: &mut AppState, mut event: event::KeyCode) -> Result<bool> {
+    // Command bar logic
+    if app_state.command_bar {
+        return handle_commands(event, app_state);
+    }
+    if matches!(event, KeyCode::Char(':')) {
+        app_state.command_bar = true;
+    }
     // On the rename screen, we just want to append to the string
     if matches!(app_state.current_screen, CurrentScreen::Typing) {
         handle_typing(event, app_state)?;
@@ -105,6 +113,30 @@ fn control_back(app_state: &mut AppState) -> Result<bool> {
 
     app_state.current_screen = prev;
     Ok(false)
+}
+
+fn handle_commands(event: KeyCode, app_state: &mut AppState) -> Result<bool> {
+    match event {
+        KeyCode::Enter => {
+            let cmd = parse_command(&app_state.buffer.text);
+            app_state.buffer.text = String::new();
+            app_state.command_bar = false;
+            return run_command(cmd);
+        }
+        KeyCode::Backspace => {
+            app_state.buffer.text.pop();
+        }
+        KeyCode::Char(c) => {
+            app_state.buffer.text.push(c);
+        }
+        KeyCode::Esc => {
+            app_state.buffer.text = String::new();
+            app_state.command_bar = false;
+        }
+        _ => (),
+    }
+
+    return Ok(false);
 }
 
 fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow::Error> {

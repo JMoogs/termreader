@@ -9,6 +9,7 @@ use logging::initialize_logging;
 use ratatui::prelude::*;
 
 pub mod appstate;
+pub mod commands;
 pub mod global;
 pub mod helpers;
 pub mod local;

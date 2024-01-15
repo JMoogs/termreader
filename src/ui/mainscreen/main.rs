@@ -42,7 +42,11 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(1)])
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(1),
+            Constraint::Length(3),
+        ])
         .split(f.size());
 
     render_tabs(chunks[0], app_state, f);
@@ -55,6 +59,24 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
         4 => render_settings(chunks[1], f),
         _ => unreachable!(),
     };
+
+    // The command list is rendered below:
+    //
+    //
+    let text = if !app_state.command_bar {
+        String::from(
+            "Quit: Esc/q | Scroll tabs: [/] | Scroll categories: {/} | Scroll entries: Up/Down",
+        )
+    } else {
+        format!(":{}_", app_state.buffer.text)
+    };
+
+    let text = Paragraph::new(text).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded),
+    );
+    f.render_widget(text, chunks[2]);
 }
 
 fn render_tabs(rect: Rect, app_state: &AppState, f: &mut Frame) {
@@ -87,8 +109,6 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
             Constraint::Length(3),
             // Book list
             Constraint::Min(1),
-            // Controls / other
-            Constraint::Length(3),
         ])
         .split(rect);
 
@@ -147,20 +167,6 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         &mut app_state.library_data.get_category_list_mut().state,
     );
 
-    // The command list is rendered below:
-    //
-    //
-    let commands = Paragraph::new(
-        "Quit: Esc/q | Scroll tabs: [/] | Scroll categories: {/} | Scroll entries: Up/Down",
-    )
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded),
-    );
-
-    f.render_widget(commands, chunks[2]);
-
     // Render a centered box on top if in certain menus.
     match app_state.current_screen {
         CurrentScreen::Library(LibraryOptions::LocalBookSelect) => {
@@ -187,7 +193,7 @@ fn render_updates(_rect: Rect, _f: &mut Frame) {}
 fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Length(3)])
+        .constraints([Constraint::Min(1)])
         .split(rect);
 
     let display_data: Vec<ListItem> = app_state
@@ -213,15 +219,6 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         f.render_stateful_widget(sources, chunks[0], app_state.source_data.get_state_mut());
     }
 
-    let commands = Paragraph::new("Quit: Esc/q | Scroll categories: {/} | Scroll entries: Up/Down")
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded),
-        );
-
-    f.render_widget(commands, chunks[1]);
-
     if let CurrentScreen::Sources(SourceOptions::SourceSelect) = app_state.current_screen {
         render_source_selection(rect, app_state, f);
     } else if let CurrentScreen::Typing = app_state.current_screen {
@@ -236,7 +233,7 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
 fn render_history(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Length(3)])
+        .constraints([Constraint::Min(1)])
         .split(rect);
 
     let display_data: Vec<ListItem> = app_state

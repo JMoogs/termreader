@@ -17,18 +17,27 @@ use crate::{
 };
 
 pub struct AppState {
+    /// Stores the current screen that is being rendered.
     pub current_screen: CurrentScreen,
     /// Stores a list of all the previously accessed screens - the implementation of the back button.
     pub prev_screens: Vec<CurrentScreen>,
     pub current_main_tab: CategoryTabs,
+    /// Stores all data related to the book library
     pub library_data: LibraryData,
+    /// Stores all data related to the reader itself, only intialized if the user has entered a book at least once in their session.
     pub reader_data: Option<ReaderData>,
+    /// Stores the reading history.
     pub history_data: HistoryData,
+    /// Contains all the options for all possible lists, and their states.
     pub menu_options: MenuOptions,
+    /// Contains data about the currently accessed source.
     pub source_data: SourceData,
     /// Buffers to store any temp data.
     pub buffer: AppBuffer,
+    /// Contains senders/recievers for the channel, used for synchronous operations.
     pub channels: ChannelData,
+    /// Represents whether the user is in the command bar or not.
+    pub command_bar: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -237,6 +246,7 @@ impl AppState {
             source_data: SourceData::build(),
             buffer: AppBuffer::default(),
             channels: ChannelData::new(),
+            command_bar: false,
         })
     }
 
