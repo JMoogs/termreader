@@ -51,7 +51,7 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
 
     render_tabs(chunks[0], app_state, f);
 
-    match app_state.current_main_tab.index {
+    match app_state.current_main_tab.selected_idx() {
         0 => render_lib(chunks[1], app_state, f),
         1 => render_updates(chunks[1], f),
         2 => render_sources(chunks[1], app_state, f),
@@ -82,7 +82,7 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
 fn render_tabs(rect: Rect, app_state: &AppState, f: &mut Frame) {
     let titles: Vec<Line> = app_state
         .current_main_tab
-        .tabs
+        .tabs()
         .clone()
         .into_iter()
         .map(|t| Line::from(t).alignment(Alignment::Center))
@@ -94,7 +94,7 @@ fn render_tabs(rect: Rect, app_state: &AppState, f: &mut Frame) {
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded),
         )
-        .select(app_state.current_main_tab.index)
+        .select(app_state.current_main_tab.selected_idx())
         .style(UNSELECTED_STYLE)
         .highlight_style(SELECTED_STYLE);
 
@@ -131,7 +131,7 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
                 .title("Categories")
                 .border_type(BorderType::Rounded),
         )
-        .select(app_state.library_data.categories.state.selected().unwrap())
+        .select(app_state.library_data.categories.selected_idx().unwrap())
         .style(UNSELECTED_STYLE)
         .highlight_style(SELECTED_STYLE);
 
@@ -164,7 +164,7 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     f.render_stateful_widget(
         books,
         chunks[1],
-        &mut app_state.library_data.get_category_list_mut().state,
+        app_state.library_data.get_category_list_mut().state_mut(),
     );
 
     // Render a centered box on top if in certain menus.
@@ -216,7 +216,11 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     if let CurrentScreen::Sources(SourceOptions::SearchResults) = app_state.current_screen {
         render_search_results(chunks[0], app_state, f, "Results");
     } else {
-        f.render_stateful_widget(sources, chunks[0], app_state.source_data.get_state_mut());
+        f.render_stateful_widget(
+            sources,
+            chunks[0],
+            app_state.source_data.sources.state_mut(),
+        );
     }
 
     if let CurrentScreen::Sources(SourceOptions::SourceSelect) = app_state.current_screen {

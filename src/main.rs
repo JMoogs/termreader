@@ -1,4 +1,5 @@
 use crate::helpers::StatefulList;
+use crate::state::channels::RequestData;
 use appstate::{AppState, BookInfo, CurrentScreen, MiscOptions, SourceOptions};
 
 use crossterm::{
@@ -17,6 +18,7 @@ pub mod logging;
 pub mod reader;
 pub mod shutdown;
 pub mod startup;
+pub mod state;
 pub mod ui;
 
 use ui::{controls::handle_controls, mainscreen::main::ui_main, reader::ui_reader};
@@ -43,10 +45,11 @@ fn main() -> Result<(), anyhow::Error> {
 
     let res = run_app(&mut terminal, &mut app_state);
 
+    // Store data on shutdown
     shutdown::store_books(&app_state.library_data.clone().into())?;
     shutdown::store_history(&app_state.history_data)?;
 
-    // Restore terminal on ending:
+    // Restore the terminal to its initial state
     terminal::disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -55,6 +58,7 @@ fn main() -> Result<(), anyhow::Error> {
     )?;
     terminal.show_cursor()?;
 
+    // Errors must be printed after the terminal is fixed, or they won't show (properly).
     if let Err(e) = res {
         println!("An error occured: {:?}", e);
     }
@@ -75,30 +79,30 @@ fn run_app<B: Backend>(
         if app_state.channels.loading {
             if let Ok(data) = app_state.channels.reciever.recv() {
                 match data {
-                    appstate::RequestData::SearchResults(res) => {
-                        app_state.buffer.novel_previews = StatefulList::with_items(res?);
+                    RequestData::SearchResults(res) => {
+                        app_state.buffer.novel_previews = StatefulList::from(res?);
                         app_state
                             .update_screen(CurrentScreen::Sources(SourceOptions::SearchResults));
                     }
-                    appstate::RequestData::BookInfo(res) => {
+                    RequestData::BookInfo(res) => {
                         let res = res?;
                         app_state.buffer.clear_novel();
                         app_state.buffer.chapter_previews =
-                            StatefulList::with_items(res.chapters.clone());
+                            StatefulList::from(res.chapters.clone());
                         app_state.buffer.novel = Some(res);
 
                         app_state.update_screen(CurrentScreen::Sources(SourceOptions::BookView));
                     }
-                    appstate::RequestData::BookInfoNoOpts(res) => {
+                    RequestData::BookInfoNoOpts(res) => {
                         let res = res?;
                         app_state.buffer.clear_novel();
                         app_state.buffer.chapter_previews =
-                            StatefulList::with_items(res.chapters.clone());
+                            StatefulList::from(res.chapters.clone());
                         app_state.buffer.novel = Some(res);
 
                         app_state.update_screen(CurrentScreen::Misc(MiscOptions::ChapterView));
                     }
-                    appstate::RequestData::ChapterTemp((res, ch_no)) => {
+                    RequestData::ChapterTemp((res, ch_no)) => {
                         let novel = app_state.buffer.novel.clone().unwrap();
                         app_state.move_to_reader(
                             BookInfo::from_novel_temp(novel, ch_no)?,
@@ -106,7 +110,7 @@ fn run_app<B: Backend>(
                             Some(res?),
                         )?;
                     }
-                    appstate::RequestData::Chapter((res, ch_no)) => {
+                    RequestData::Chapter((res, ch_no)) => {
                         let mut book = app_state
                             .library_data
                             .get_category_list_mut()

@@ -33,7 +33,11 @@ pub fn render_source_selection(rect: Rect, app_state: &mut AppState, f: &mut Fra
         .highlight_symbol("> ");
 
     let r = centered_sized_rect(max_width as u16, height as u16, rect);
-    f.render_stateful_widget(display, r, &mut app_state.menu_options.source_options.state)
+    f.render_stateful_widget(
+        display,
+        r,
+        app_state.menu_options.source_options.state_mut(),
+    )
 }
 
 pub fn render_search_results(
@@ -60,7 +64,7 @@ pub fn render_search_results(
         .highlight_style(SELECTED_STYLE)
         .highlight_symbol("> ");
 
-    f.render_stateful_widget(results, rect, &mut app_state.buffer.novel_previews.state);
+    f.render_stateful_widget(results, rect, app_state.buffer.novel_previews.state_mut());
 }
 
 pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
@@ -155,7 +159,7 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
     f.render_stateful_widget(
         display,
         chunks_vert_2[0],
-        &mut app_state.menu_options.source_book_options.state,
+        app_state.menu_options.source_book_options.state_mut(),
     );
 
     // Chapters
@@ -195,6 +199,6 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
     f.render_stateful_widget(
         display,
         chunks_vert_2[1],
-        &mut app_state.buffer.chapter_previews.state,
+        app_state.buffer.chapter_previews.state_mut(),
     );
 }

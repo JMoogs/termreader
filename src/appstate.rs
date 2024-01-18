@@ -1,14 +1,16 @@
 use anyhow::Result;
-use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::mpsc::{Receiver, Sender};
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
-use crate::global::sources::source_data::SourceBookBox;
-use crate::global::sources::{Chapter, ChapterPreview, NovelPreview, SourceID};
+use crate::global::sources::{Chapter, SourceID};
 use crate::reader::buffer::{BookProgress, BookProgressData};
 use crate::reader::ReaderData;
+use crate::state::{
+    buffer::AppBuffer,
+    channels::ChannelData,
+    history::{HistoryData, HistoryEntry},
+};
 use crate::{
     global::sources::{source_data::SourceData, Novel},
     helpers::{CategoryTabs, StatefulList},
@@ -21,97 +23,24 @@ pub struct AppState {
     pub current_screen: CurrentScreen,
     /// Stores a list of all the previously accessed screens - the implementation of the back button.
     pub prev_screens: Vec<CurrentScreen>,
+    /// Manages the state of the main tabs
     pub current_main_tab: CategoryTabs,
     /// Stores all data related to the book library
     pub library_data: LibraryData,
-    /// Stores all data related to the reader itself, only intialized if the user has entered a book at least once in their session.
+    /// Stores all data related to the reader itself, only intialized if the user has entered a book at least once in their session
     pub reader_data: Option<ReaderData>,
-    /// Stores the reading history.
+    /// Stores reading history
     pub history_data: HistoryData,
-    /// Contains all the options for all possible lists, and their states.
+    /// Contains all the options for all possible lists, and their states
     pub menu_options: MenuOptions,
-    /// Contains data about the currently accessed source.
+    /// Contains data about the currently accessed source
     pub source_data: SourceData,
-    /// Buffers to store any temp data.
+    /// Buffers to store any temporary data
     pub buffer: AppBuffer,
-    /// Contains senders/recievers for the channel, used for synchronous operations.
+    /// Contains senders/recievers for the channel, used for any synchronous operations
     pub channels: ChannelData,
-    /// Represents whether the user is in the command bar or not.
+    /// Represents whether the user is in the command bar or not
     pub command_bar: bool,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct AppBuffer {
-    pub text: String,
-    pub novel_previews: StatefulList<NovelPreview>,
-    pub chapter_previews: StatefulList<ChapterPreview>,
-    pub novel: Option<Novel>,
-    pub novel_preview_scroll: usize,
-    pub novel_preview_selection: SourceBookBox,
-}
-
-impl AppBuffer {
-    pub fn clear(&mut self) {
-        let _ = std::mem::take(self);
-    }
-
-    pub fn clear_novel(&mut self) {
-        self.chapter_previews = StatefulList::new();
-        self.novel = None;
-        self.novel_preview_scroll = 0;
-        self.novel_preview_selection = SourceBookBox::Options;
-    }
-
-    pub fn ch_list_setup(&mut self) {
-        self.clear();
-        self.novel_preview_selection = SourceBookBox::Chapters;
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct HistoryData {
-    pub history: VecDeque<HistoryEntry>,
-    #[serde(skip)]
-    pub selected: ListState,
-}
-
-impl HistoryData {
-    pub fn clear(&mut self) {
-        self.history = VecDeque::new();
-        self.selected.select(None);
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HistoryEntry {
-    pub book: BookInfo,
-    pub timestamp: u64,
-    pub chapter: usize,
-}
-
-pub struct ChannelData {
-    pub sender: Sender<RequestData>,
-    pub reciever: Receiver<RequestData>,
-    pub loading: bool,
-}
-
-impl ChannelData {
-    fn new() -> Self {
-        let (sender, reciever) = std::sync::mpsc::channel();
-        Self {
-            sender,
-            reciever,
-            loading: false,
-        }
-    }
-}
-
-pub enum RequestData {
-    SearchResults(Result<Vec<NovelPreview>>),
-    BookInfo(Result<Novel>),
-    BookInfoNoOpts(Result<Novel>),
-    ChapterTemp((Result<Chapter>, usize)),
-    Chapter((Result<Chapter>, usize)),
 }
 
 pub struct MenuOptions {
@@ -127,7 +56,7 @@ pub struct MenuOptions {
 
 impl MenuOptions {
     fn new(categories: Vec<String>) -> Self {
-        let local_options = StatefulList::with_items(vec![
+        let local_options = StatefulList::from(vec![
             String::from("Continue reading"),
             String::from("Move to category..."),
             String::from("Rename"),
@@ -135,7 +64,7 @@ impl MenuOptions {
             String::from("Remove book from library"),
         ]);
 
-        let global_options = StatefulList::with_items(vec![
+        let global_options = StatefulList::from(vec![
             String::from("Continue reading"),
             String::from("View chapter list"),
             String::from("Move to category..."),
@@ -144,29 +73,29 @@ impl MenuOptions {
             String::from("Remove book from library"),
         ]);
 
-        let local_history_options = StatefulList::with_items(vec![
+        let local_history_options = StatefulList::from(vec![
             String::from("Continue reading"),
             String::from("Remove from history"),
         ]);
 
-        let global_history_options = StatefulList::with_items(vec![
+        let global_history_options = StatefulList::from(vec![
             String::from("Continue reading"),
             String::from("View book"),
             String::from("Remove from history"),
         ]);
 
-        let category_list = StatefulList::with_items(categories);
+        let category_list = StatefulList::from(categories);
 
         let source_options =
-            StatefulList::with_items(vec![String::from("Search"), String::from("View popular")]);
+            StatefulList::from(vec![String::from("Search"), String::from("View popular")]);
 
-        let source_book_options = StatefulList::with_items(vec![
+        let source_book_options = StatefulList::from(vec![
             String::from("Start from beginning"),
             String::from("Add book to library"),
             // String::from("View chapters"),
         ]);
 
-        let category_options = StatefulList::with_items(vec![
+        let category_options = StatefulList::from(vec![
             String::from("Create categories"),
             String::from("Re-order categories (Not yet implemented)"),
             String::from("Rename categories"),
@@ -223,7 +152,7 @@ impl AppState {
 
     pub fn update_category_list(&mut self) {
         self.menu_options.category_list =
-            StatefulList::with_items(self.library_data.categories.items.clone());
+            StatefulList::from(self.library_data.categories.items.clone());
     }
 
     pub fn build() -> Result<Self, anyhow::Error> {
@@ -240,13 +169,7 @@ impl AppState {
         Ok(Self {
             current_screen: CurrentScreen::Library(LibraryOptions::Default),
             prev_screens: Vec::new(),
-            current_main_tab: CategoryTabs::with_tabs(vec![
-                String::from("Library"),
-                String::from("Updates"),
-                String::from("Sources"),
-                String::from("History"),
-                String::from("Settings"),
-            ]),
+            current_main_tab: CategoryTabs::build(),
             library_data,
             history_data,
             reader_data: None,
@@ -330,21 +253,18 @@ impl AppState {
     }
 
     pub fn reset_selections(&mut self) {
-        self.menu_options.global_options.state.select(Some(0));
-        self.menu_options.local_options.state.select(Some(0));
-        self.menu_options.source_options.state.select(Some(0));
-        self.menu_options
-            .local_history_options
-            .state
-            .select(Some(0));
-        self.menu_options
-            .global_history_options
-            .state
-            .select(Some(0));
+        self.menu_options.global_options.select_first();
+        self.menu_options.local_options.select_first();
+        self.menu_options.source_options.select_first();
+        self.menu_options.local_history_options.select_first();
+        self.menu_options.global_history_options.select_first();
+        self.menu_options.category_list.select_first();
+        self.menu_options.source_book_options.select_first();
+        self.menu_options.category_options.select_first();
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LibraryData {
     // This string contains the category name, and the stateful list contains all books under the aforementioned category.
     pub books: HashMap<String, StatefulList<LibBookInfo>>,
@@ -353,6 +273,18 @@ pub struct LibraryData {
 }
 
 impl LibraryData {
+    pub fn empty() -> Self {
+        let default_name = String::from("Default");
+        let mut map = HashMap::new();
+        map.insert(default_name.clone(), StatefulList::new());
+
+        Self {
+            books: map,
+            default_category_name: default_name.clone(),
+            categories: StatefulList::with_item(default_name),
+        }
+    }
+
     // Problem: does not unselect if the book is selected.
     pub fn move_category(&mut self, id: ID, category_name: Option<String>) {
         let book = self.find_book(id).unwrap().clone();
@@ -404,8 +336,8 @@ impl LibraryData {
                 .position(|r| r == &name)
                 .unwrap();
             // If the category being deleted is removed, set the selection to the first category, that will always exist.
-            if pos == self.categories.state.selected().unwrap() {
-                self.categories.state.select(Some(0))
+            if pos == self.categories.selected_idx().unwrap() {
+                self.categories.select_first()
             }
             self.categories.items.remove(pos);
 
@@ -438,7 +370,7 @@ impl LibraryData {
         list.items.push(book);
 
         if list.items.len() == 1 {
-            list.state.select(Some(0));
+            list.select_first();
         }
     }
 
@@ -453,15 +385,15 @@ impl LibraryData {
 
             let pos = search.unwrap();
 
-            let sel = list.state.selected().unwrap();
+            let sel = list.selected_idx().unwrap();
 
             list.items.remove(pos);
 
             if sel == pos {
                 if !list.items.is_empty() {
-                    list.state.select(Some(0));
+                    list.select_first();
                 } else {
-                    list.state.select(None);
+                    list.unselect();
                 }
             }
         }
@@ -514,7 +446,7 @@ impl LibraryData {
     }
 
     pub fn get_category_list(&self) -> &StatefulList<LibBookInfo> {
-        let idx = self.categories.state.selected().unwrap();
+        let idx = self.categories.selected_idx().unwrap();
 
         let name = &self.categories.items[idx];
 
@@ -525,71 +457,13 @@ impl LibraryData {
     }
 
     pub fn get_category_list_mut(&mut self) -> &mut StatefulList<LibBookInfo> {
-        let idx = self.categories.state.selected().unwrap();
+        let idx = self.categories.selected_idx().unwrap();
 
         let name = &self.categories.items[idx];
 
         match self.books.get_mut(name) {
             Some(books) => books,
             None => panic!("This should never happen"),
-        }
-    }
-}
-
-impl From<LibraryJson> for LibraryData {
-    fn from(mut value: LibraryJson) -> Self {
-        let mut map: HashMap<_, StatefulList<_>> = HashMap::new();
-
-        let default_category_name = value.default_category_name.clone();
-
-        // Create all the expected categories in advance
-        for category in &value.categories {
-            map.insert(category.clone(), StatefulList::new());
-        }
-
-        for book in value.entries {
-            match book.category.clone() {
-                None => {
-                    if let Some(list) = map.get_mut(&default_category_name) {
-                        list.insert(book);
-                    } else {
-                        map.insert(
-                            value.default_category_name.clone(),
-                            StatefulList::with_item(book),
-                        );
-                    }
-                }
-                Some(category) => {
-                    if let Some(list) = map.get_mut(&category) {
-                        list.insert(book);
-                    } else {
-                        // If the category doesn't exist, simply put the book in the default category.
-                        // TODO: On saving, revert the category to the default one
-                        if map.contains_key(&default_category_name) {
-                            map.get_mut(&default_category_name).unwrap().insert(book);
-                        } else {
-                            map.insert(
-                                value.default_category_name.clone(),
-                                StatefulList::with_item(book),
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        // Ensure the default category has an entry, so that other functions always work.
-        if !map.contains_key(&default_category_name) {
-            map.insert(value.default_category_name.clone(), StatefulList::new());
-        }
-
-        value.categories.insert(0, value.default_category_name);
-        let categories = StatefulList::with_items(value.categories);
-
-        LibraryData {
-            books: map,
-            categories,
-            default_category_name,
         }
     }
 }
@@ -685,58 +559,6 @@ impl ID {
 
         Self {
             id: unix_timestamp.as_nanos(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct LibraryJson {
-    pub default_category_name: String,
-    pub categories: Vec<String>,
-    pub entries: Vec<LibBookInfo>,
-}
-
-impl LibraryJson {
-    pub fn new(categories: Vec<String>, entries: Vec<LibBookInfo>) -> Self {
-        Self {
-            default_category_name: String::from("Default"),
-            categories,
-            entries,
-        }
-    }
-
-    pub fn empty() -> Self {
-        Self {
-            default_category_name: String::from("Default"),
-            categories: Vec::new(),
-            entries: Vec::new(),
-        }
-    }
-}
-
-impl From<LibraryData> for LibraryJson {
-    fn from(value: LibraryData) -> Self {
-        let default_category_name = value.default_category_name;
-        let categories = value.categories.items;
-
-        // Don't add the default
-        let categories = categories
-            .into_iter()
-            .filter(|v| v != &default_category_name)
-            .collect();
-
-        let entries: Vec<LibBookInfo> = value
-            .books
-            .into_values()
-            .flat_map(|v| {
-                let s: Vec<LibBookInfo> = v.into();
-                s
-            })
-            .collect();
-        Self {
-            default_category_name,
-            categories,
-            entries,
         }
     }
 }

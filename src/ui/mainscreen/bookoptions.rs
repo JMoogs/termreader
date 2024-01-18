@@ -35,7 +35,7 @@ pub fn render_local_selection(rect: Rect, app_state: &mut AppState, f: &mut Fram
         .highlight_symbol("> ");
 
     let r = centered_sized_rect(max_width as u16, height as u16, rect);
-    f.render_stateful_widget(display, r, &mut app_state.menu_options.local_options.state)
+    f.render_stateful_widget(display, r, app_state.menu_options.local_options.state_mut())
 }
 
 pub fn render_global_selection(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
@@ -68,7 +68,11 @@ pub fn render_global_selection(rect: Rect, app_state: &mut AppState, f: &mut Fra
         .highlight_symbol("> ");
 
     let r = centered_sized_rect(max_width as u16, height as u16, rect);
-    f.render_stateful_widget(display, r, &mut app_state.menu_options.global_options.state)
+    f.render_stateful_widget(
+        display,
+        r,
+        app_state.menu_options.global_options.state_mut(),
+    )
 }
 
 pub fn render_category_options(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
@@ -104,7 +108,7 @@ pub fn render_category_options(rect: Rect, app_state: &mut AppState, f: &mut Fra
     f.render_stateful_widget(
         display,
         r,
-        &mut app_state.menu_options.category_options.state,
+        app_state.menu_options.category_options.state_mut(),
     )
 }
 
@@ -157,7 +161,7 @@ pub fn render_category_box(rect: Rect, app_state: &mut AppState, f: &mut Frame) 
 
     let r = centered_sized_rect(max_width as u16, height as u16, rect);
     // let r = centered_rect(20, 20, rect);
-    f.render_stateful_widget(display, r, &mut app_state.menu_options.category_list.state)
+    f.render_stateful_widget(display, r, app_state.menu_options.category_list.state_mut())
 }
 
 pub fn render_ch_list(app_state: &mut AppState, f: &mut Frame) {
@@ -247,7 +251,7 @@ pub fn render_ch_list(app_state: &mut AppState, f: &mut Frame) {
     f.render_stateful_widget(
         display,
         chunks_horiz[1],
-        &mut app_state.buffer.chapter_previews.state,
+        app_state.buffer.chapter_previews.state_mut(),
     )
 }
 
@@ -284,7 +288,7 @@ pub fn render_global_selection_history(rect: Rect, app_state: &mut AppState, f: 
     f.render_stateful_widget(
         display,
         r,
-        &mut app_state.menu_options.global_history_options.state,
+        app_state.menu_options.global_history_options.state_mut(),
     )
 }
 
@@ -321,6 +325,6 @@ pub fn render_local_selection_history(rect: Rect, app_state: &mut AppState, f: &
     f.render_stateful_widget(
         display,
         r,
-        &mut app_state.menu_options.local_history_options.state,
+        app_state.menu_options.local_history_options.state_mut(),
     )
 }

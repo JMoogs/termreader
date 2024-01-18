@@ -1,18 +1,23 @@
-use crate::appstate::{HistoryData, LibraryJson};
+use crate::appstate::LibraryData;
+use crate::state::history::HistoryData;
 use anyhow::Result;
 use std::fs;
 
-pub fn load_books() -> Result<LibraryJson> {
+/// Loads library data from a `books.json` file
+pub fn load_books() -> Result<LibraryData> {
     let book_data = fs::read_to_string("books.json");
     if book_data.is_err() {
-        return Ok(LibraryJson::empty());
+        return Ok(LibraryData::empty());
+    } else {
+        let book_data = book_data.unwrap();
+        let mut books: LibraryData = serde_json::from_str(&book_data)?;
+        // A category must be selected, though selection data is not stored when saving.
+        books.categories.select_first();
+        return Ok(books);
     }
-    let book_data = book_data.unwrap();
-
-    let books: LibraryJson = serde_json::from_str(&book_data)?;
-    Ok(books)
 }
 
+/// Loads history data from a `history.json` file
 pub fn load_history() -> Result<HistoryData> {
     let history_data = fs::read_to_string("history.json");
     match history_data {

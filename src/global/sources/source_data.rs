@@ -1,6 +1,5 @@
 use crate::global::sources::SortOrder;
 use anyhow::Result;
-use ratatui::widgets::ListState;
 use serde::{Deserialize, Serialize};
 
 use crate::helpers::StatefulList;
@@ -171,8 +170,8 @@ impl SourceData {
             free_web_novel,
         ];
 
-        let mut sources = StatefulList::with_items(v);
-        sources.state.select(Some(0));
+        let mut sources = StatefulList::from(v);
+        sources.select_first();
 
         Self { sources }
     }
@@ -189,13 +188,13 @@ impl SourceData {
         self.sources.items.iter().map(|t| t.get_name()).collect()
     }
 
-    pub fn get_state(&self) -> &ListState {
-        &self.sources.state
-    }
+    // pub fn get_state(&self) -> &ListState {
+    //     &self.sources.state_mut()
+    // }
 
-    pub fn get_state_mut(&mut self) -> &mut ListState {
-        &mut self.sources.state
-    }
+    // pub fn get_state_mut(&mut self) -> &mut ListState {
+    //     &mut self.sources.state
+    // }
 
     pub fn get_source_by_id(&self, id: SourceID) -> &Source {
         for s in self.sources.items.iter() {

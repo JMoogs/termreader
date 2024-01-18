@@ -3,12 +3,13 @@ use std::thread;
 use crate::{
     appstate::{
         AppState, BookInfo, BookSource, CurrentScreen, HistoryOptions, LibBookInfo, LibraryOptions,
-        MiscOptions, RequestData, SettingsOptions, SourceOptions, UpdateOptions,
+        MiscOptions, SettingsOptions, SourceOptions, UpdateOptions,
     },
     commands::{parse_command, run_command},
     global::sources::{source_data::SourceBookBox, Scrape, SortOrder},
     helpers::StatefulList,
     reader::buffer::BookProgress,
+    state::channels::RequestData,
 };
 use anyhow::Result;
 use crossterm::event::{self, KeyCode};
@@ -192,7 +193,7 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
                     app_state.channels.loading = true;
                     let source = app_state.source_data.get_list().selected().unwrap().clone();
                     let text = app_state.buffer.text.clone();
-                    let tx = app_state.channels.sender.clone();
+                    let tx = app_state.channels.get_sender();
                     app_state.channels.loading = true;
                     thread::spawn(move || {
                         let res = source.search_novels(&text);
@@ -212,7 +213,7 @@ fn control_main_menu(app_state: &mut AppState, event: event::KeyCode) {
     match event {
         KeyCode::Char(']') | KeyCode::Tab => {
             app_state.current_main_tab.next();
-            match app_state.current_main_tab.index {
+            match app_state.current_main_tab.selected_idx() {
                 0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
                 1 => app_state.current_screen = CurrentScreen::Updates(UpdateOptions::Default),
                 2 => app_state.current_screen = CurrentScreen::Sources(SourceOptions::Default),
@@ -223,7 +224,7 @@ fn control_main_menu(app_state: &mut AppState, event: event::KeyCode) {
         }
         KeyCode::Char('[') | KeyCode::BackTab => {
             app_state.current_main_tab.previous();
-            match app_state.current_main_tab.index {
+            match app_state.current_main_tab.selected_idx() {
                 0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
                 1 => app_state.current_screen = CurrentScreen::Updates(UpdateOptions::Default),
                 2 => app_state.current_screen = CurrentScreen::Sources(SourceOptions::Default),
@@ -264,7 +265,7 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
                     .source_data
                     .get_source_by_id(book.get_source_id().unwrap())
                     .clone();
-                let tx = app_state.channels.sender.clone();
+                let tx = app_state.channels.get_sender();
 
                 app_state.channels.loading = true;
                 thread::spawn(move || {
@@ -297,7 +298,7 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
                     .source_data
                     .get_source_by_id(book.get_source_id().unwrap())
                     .clone();
-                let tx = app_state.channels.sender.clone();
+                let tx = app_state.channels.get_sender();
 
                 app_state.channels.loading = true;
                 thread::spawn(move || {
@@ -407,11 +408,7 @@ fn control_library_menu(app_state: &mut AppState, event: event::KeyCode) -> Resu
         KeyCode::Char('c') => {
             // Opens a menu in which you can create / delete / reorder categories
             // Select the first option upon entering
-            app_state
-                .menu_options
-                .category_options
-                .state
-                .select(Some(0));
+            app_state.menu_options.category_options.select_first();
             app_state.update_screen(CurrentScreen::Library(LibraryOptions::CategoryOptions))
         }
         _ => (),
@@ -427,12 +424,7 @@ fn control_library_local_book_select(
         KeyCode::Up => app_state.menu_options.local_options.previous(),
         KeyCode::Down => app_state.menu_options.local_options.next(),
         KeyCode::Enter => {
-            let option = app_state
-                .menu_options
-                .local_options
-                .state
-                .selected()
-                .unwrap();
+            let option = app_state.menu_options.local_options.selected_idx().unwrap();
 
             let mut book = app_state
                 .library_data
@@ -465,7 +457,7 @@ fn control_library_local_book_select(
                 }
                 _ => unreachable!(),
             }
-            app_state.menu_options.local_options.state.select(Some(0));
+            app_state.menu_options.local_options.select_first();
         }
         _ => (),
     }
@@ -483,8 +475,7 @@ fn control_library_global_book_select(
             let option = app_state
                 .menu_options
                 .global_options
-                .state
-                .selected()
+                .selected_idx()
                 .unwrap();
 
             let mut book = app_state
@@ -505,7 +496,7 @@ fn control_library_global_book_select(
                         .source_data
                         .get_source_by_id(book.get_source_id().unwrap())
                         .clone();
-                    let tx = app_state.channels.sender.clone();
+                    let tx = app_state.channels.get_sender();
 
                     if matches!(progress, BookProgress::Finished) {
                         let next = book.get_source_data().get_next_chapter();
@@ -544,8 +535,7 @@ fn control_library_global_book_select(
                     };
 
                     app_state.buffer.ch_list_setup();
-                    app_state.buffer.chapter_previews =
-                        StatefulList::with_items(novel.chapters.clone());
+                    app_state.buffer.chapter_previews = StatefulList::from(novel.chapters.clone());
                     app_state.buffer.novel = Some(novel);
 
                     app_state.update_screen(CurrentScreen::Misc(MiscOptions::ChapterView));
@@ -571,7 +561,7 @@ fn control_library_global_book_select(
                         .source_data
                         .get_source_by_id(book.get_source_id().unwrap())
                         .clone();
-                    let tx = app_state.channels.sender.clone();
+                    let tx = app_state.channels.get_sender();
 
                     app_state.channels.loading = true;
                     thread::spawn(move || {
@@ -590,7 +580,7 @@ fn control_library_global_book_select(
                 _ => unreachable!(),
             }
 
-            app_state.menu_options.global_options.state.select(Some(0));
+            app_state.menu_options.global_options.select_first();
         }
         _ => (),
     }
@@ -608,8 +598,7 @@ fn control_library_category_select(app_state: &mut AppState, event: event::KeyCo
                 let opt = app_state
                     .menu_options
                     .category_options
-                    .state
-                    .selected()
+                    .selected_idx()
                     .unwrap();
 
                 if opt == 2 {
@@ -625,7 +614,7 @@ fn control_library_category_select(app_state: &mut AppState, event: event::KeyCo
                             .unwrap()
                             .clone(),
                     );
-                    app_state.menu_options.category_list.state.select(Some(0));
+                    app_state.menu_options.category_list.select_first();
                     app_state.update_category_list();
                     app_state.to_lib_screen();
                     app_state
@@ -665,8 +654,7 @@ fn control_library_category_options(app_state: &mut AppState, event: event::KeyC
             let choice = app_state
                 .menu_options
                 .category_options
-                .state
-                .selected()
+                .selected_idx()
                 .unwrap();
             match choice {
                 // Create a category
@@ -704,7 +692,7 @@ fn control_chapter_view(app_state: &mut AppState, event: event::KeyCode) -> Resu
         KeyCode::Enter => {
             if app_state.buffer.novel_preview_selection == SourceBookBox::Chapters {
                 // Chapters
-                let chap = app_state.buffer.chapter_previews.state.selected().unwrap();
+                let chap = app_state.buffer.chapter_previews.selected_idx().unwrap();
                 let book = app_state
                     .library_data
                     .get_category_list()
@@ -720,7 +708,7 @@ fn control_chapter_view(app_state: &mut AppState, event: event::KeyCode) -> Resu
                     .source_data
                     .get_source_by_id(book.get_source_id().unwrap())
                     .clone();
-                let tx = app_state.channels.sender.clone();
+                let tx = app_state.channels.get_sender();
                 app_state.channels.loading = true;
 
                 thread::spawn(move || {
@@ -770,8 +758,7 @@ fn control_source_select(app_state: &mut AppState, event: event::KeyCode) -> Res
             let option = app_state
                 .menu_options
                 .source_options
-                .state
-                .selected()
+                .selected_idx()
                 .unwrap();
             // 0 = search
             // 1 = view popular
@@ -782,7 +769,7 @@ fn control_source_select(app_state: &mut AppState, event: event::KeyCode) -> Res
                 1 => {
                     app_state.channels.loading = true;
                     let source = app_state.source_data.get_list().selected().unwrap().clone();
-                    let tx = app_state.channels.sender.clone();
+                    let tx = app_state.channels.get_sender();
                     app_state.channels.loading = true;
                     thread::spawn(move || {
                         let res = source.get_popular(SortOrder::Rating, 1);
@@ -844,15 +831,14 @@ fn control_source_book_view(app_state: &mut AppState, event: event::KeyCode) -> 
                     let opt = app_state
                         .menu_options
                         .source_book_options
-                        .state
-                        .selected()
+                        .selected_idx()
                         .unwrap();
                     match opt {
                         // Start from beginning
                         0 => {
                             let novel = app_state.buffer.novel.clone().unwrap();
                             let source = app_state.source_data.sources.selected().unwrap().clone();
-                            let tx = app_state.channels.sender.clone();
+                            let tx = app_state.channels.get_sender();
                             app_state.channels.loading = true;
 
                             thread::spawn(move || {
@@ -891,7 +877,7 @@ fn control_source_book_view(app_state: &mut AppState, event: event::KeyCode) -> 
                         .source_data
                         .get_source_by_id(info.get_source_id().unwrap())
                         .clone();
-                    let tx = app_state.channels.sender.clone();
+                    let tx = app_state.channels.get_sender();
                     app_state.channels.loading = true;
 
                     thread::spawn(move || {
@@ -925,7 +911,7 @@ fn control_source_search_result(app_state: &mut AppState, event: event::KeyCode)
                 .url
                 .clone();
             let source = app_state.source_data.sources.selected().unwrap().clone();
-            let tx = app_state.channels.sender.clone();
+            let tx = app_state.channels.get_sender();
 
             app_state.channels.loading = true;
             thread::spawn(move || {
@@ -949,8 +935,7 @@ fn control_history_global_book_select(
             let option = app_state
                 .menu_options
                 .global_history_options
-                .state
-                .selected()
+                .selected_idx()
                 .unwrap();
 
             let idx = app_state.history_data.selected.selected();
@@ -973,7 +958,7 @@ fn control_history_global_book_select(
                         .source_data
                         .get_source_by_id(book.get_source_id().unwrap())
                         .clone();
-                    let tx = app_state.channels.sender.clone();
+                    let tx = app_state.channels.get_sender();
 
                     if matches!(progress, BookProgress::Finished) {
                         let next = book.get_source_data().get_next_chapter();
@@ -1011,7 +996,7 @@ fn control_history_global_book_select(
                         .source_data
                         .get_source_by_id(book.get_source_id().unwrap())
                         .clone();
-                    let tx = app_state.channels.sender.clone();
+                    let tx = app_state.channels.get_sender();
 
                     app_state.channels.loading = true;
                     thread::spawn(move || {
@@ -1052,8 +1037,7 @@ fn control_history_local_book_select(
             let option = app_state
                 .menu_options
                 .local_history_options
-                .state
-                .selected()
+                .selected_idx()
                 .unwrap();
 
             let idx = app_state.history_data.selected.selected();

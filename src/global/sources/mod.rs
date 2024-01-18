@@ -67,7 +67,7 @@ impl Novel {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 pub struct ChapterPreview {
     pub chapter_no: usize,
     pub release_date: String,
@@ -84,7 +84,7 @@ pub struct Chapter {
     pub chapter_contents: String,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize)]
 pub struct NovelPreview {
     pub source: SourceID,
     pub name: String,
