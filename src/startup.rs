@@ -1,10 +1,6 @@
-use crate::{
-    appstate::{HistoryData, LibraryJson},
-    shutdown::HistoryJson,
-};
+use crate::appstate::{HistoryData, LibraryJson};
 use anyhow::Result;
-use ratatui::widgets::ListState;
-use std::{collections::VecDeque, fs};
+use std::fs;
 
 pub fn load_books() -> Result<LibraryJson> {
     let book_data = fs::read_to_string("books.json");
@@ -21,17 +17,8 @@ pub fn load_history() -> Result<HistoryData> {
     let history_data = fs::read_to_string("history.json");
     match history_data {
         Ok(d) => {
-            let data: HistoryJson = serde_json::from_str(&d)?;
-            Ok(HistoryData {
-                history: data.history,
-                selected: ListState::default(),
-            })
+            return Ok(serde_json::from_str(&d)?);
         }
-        Err(_) => {
-            Ok(HistoryData {
-                history: VecDeque::new(),
-                selected: ListState::default(),
-            })
-        }
+        Err(_) => Ok(HistoryData::default()),
     }
 }

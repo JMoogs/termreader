@@ -68,9 +68,10 @@ impl AppBuffer {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HistoryData {
     pub history: VecDeque<HistoryEntry>,
+    #[serde(skip)]
     pub selected: ListState,
 }
 
@@ -343,7 +344,7 @@ impl AppState {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LibraryData {
     // This string contains the category name, and the stateful list contains all books under the aforementioned category.
     pub books: HashMap<String, StatefulList<LibBookInfo>>,

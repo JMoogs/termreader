@@ -19,7 +19,6 @@ pub mod shutdown;
 pub mod startup;
 pub mod ui;
 
-use shutdown::HistoryJson;
 use ui::{controls::handle_controls, mainscreen::main::ui_main, reader::ui_reader};
 
 const UNSELECTED_STYLE: ratatui::style::Style = Style::new().fg(Color::White);
@@ -45,7 +44,7 @@ fn main() -> Result<(), anyhow::Error> {
     let res = run_app(&mut terminal, &mut app_state);
 
     shutdown::store_books(&app_state.library_data.clone().into())?;
-    shutdown::store_history(&HistoryJson::from_history(&app_state.history_data))?;
+    shutdown::store_history(&app_state.history_data)?;
 
     // Restore terminal on ending:
     terminal::disable_raw_mode()?;

@@ -1,7 +1,7 @@
 use chrono::{TimeZone, Utc};
 use ratatui::widgets::ListState;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct StatefulList<T> {
     pub state: ListState,
     pub items: Vec<T>,
