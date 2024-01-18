@@ -40,9 +40,6 @@ fn main() -> Result<(), anyhow::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // TESTING:
-    // shutdown::store_books(&shutdown::generate_lib_info())?;
-
     let mut app_state = AppState::build()?;
 
     let res = run_app(&mut terminal, &mut app_state);

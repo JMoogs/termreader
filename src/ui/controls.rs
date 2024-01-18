@@ -121,7 +121,7 @@ fn handle_commands(event: KeyCode, app_state: &mut AppState) -> Result<bool> {
             let cmd = parse_command(&app_state.buffer.text);
             app_state.buffer.text = String::new();
             app_state.command_bar = false;
-            return run_command(cmd);
+            return run_command(cmd, app_state);
         }
         KeyCode::Backspace => {
             app_state.buffer.text.pop();

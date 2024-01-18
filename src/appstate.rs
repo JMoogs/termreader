@@ -74,6 +74,13 @@ pub struct HistoryData {
     pub selected: ListState,
 }
 
+impl HistoryData {
+    pub fn clear(&mut self) {
+        self.history = VecDeque::new();
+        self.selected.select(None);
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistoryEntry {
     pub book: BookInfo,
