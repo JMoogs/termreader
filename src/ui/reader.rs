@@ -58,6 +58,12 @@ fn render_bottom(rect: Rect, app_state: &AppState, f: &mut Frame) {
         format!("{}, Ch {} | {:.2}% | {}", title, ch, progress_pct, time)
     };
 
+    let display = if !app_state.command_bar {
+        display
+    } else {
+        format!(":{}_", app_state.buffer.text)
+    };
+
     let text = Paragraph::new(display).block(
         Block::new()
             .borders(Borders::ALL)
