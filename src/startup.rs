@@ -1,5 +1,5 @@
-use crate::appstate::LibraryData;
 use crate::state::history::HistoryData;
+use crate::state::library::LibraryData;
 use anyhow::Result;
 use std::fs;
 

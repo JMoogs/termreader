@@ -2,14 +2,14 @@ use std::thread;
 
 use crate::{
     appstate::{
-        AppState, BookInfo, BookSource, CurrentScreen, HistoryOptions, LibBookInfo, LibraryOptions,
-        MiscOptions, SettingsOptions, SourceOptions, UpdateOptions,
+        AppState, BookInfo, BookSource, CurrentScreen, HistoryOptions, LibraryOptions, MiscOptions,
+        SettingsOptions, SourceOptions, UpdateOptions,
     },
     commands::{parse_command, run_command},
     global::sources::{source_data::SourceBookBox, Scrape, SortOrder},
     helpers::StatefulList,
     reader::buffer::BookProgress,
-    state::channels::RequestData,
+    state::{channels::RequestData, library::LibBookInfo},
 };
 use anyhow::Result;
 use crossterm::event::{self, KeyCode};
