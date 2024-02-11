@@ -1,19 +1,23 @@
-use std::thread;
-
 use crate::{
-    appstate::{
-        AppState, BookInfo, BookSource, CurrentScreen, HistoryOptions, LibraryOptions, MiscOptions,
-        SettingsOptions, SourceOptions, UpdateOptions,
-    },
+    appstate::AppState,
     commands::{parse_command, run_command},
     global::sources::{source_data::SourceBookBox, Scrape, SortOrder},
     helpers::StatefulList,
     reader::buffer::BookProgress,
-    state::{channels::RequestData, library::LibBookInfo},
+    state::{
+        book_info::{BookInfo, BookSource},
+        channels::RequestData,
+        library::LibBookInfo,
+        screen::{
+            CurrentScreen, HistoryOptions, LibraryOptions, MiscOptions, SettingsOptions,
+            SourceOptions, UpdateOptions,
+        },
+    },
 };
 use anyhow::Result;
 use crossterm::event::{self, KeyCode};
 use ratatui::widgets::ListState;
+use std::thread;
 
 pub fn handle_controls(app_state: &mut AppState, mut event: event::KeyCode) -> Result<bool> {
     // Command bar logic
@@ -119,7 +123,7 @@ fn control_back(app_state: &mut AppState) -> Result<bool> {
 fn handle_commands(event: KeyCode, app_state: &mut AppState) -> Result<bool> {
     match event {
         KeyCode::Enter => {
-            let cmd = parse_command(&app_state.buffer.text);
+            let cmd = parse_command(&app_state.buffer.text, app_state);
             app_state.buffer.text = String::new();
             app_state.command_bar = false;
             return run_command(cmd, app_state);

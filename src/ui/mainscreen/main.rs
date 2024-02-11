@@ -1,8 +1,7 @@
 use crate::{
-    appstate::{
-        AppState, CurrentScreen, HistoryOptions, LibraryOptions, MiscOptions, SourceOptions,
-    },
+    appstate::AppState,
     helpers::to_datetime,
+    state::screen::{CurrentScreen, HistoryOptions, LibraryOptions, MiscOptions, SourceOptions},
     ui::mainscreen::bookoptions::{
         render_category_box, render_category_options, render_local_selection, render_type_box,
     },

@@ -1,4 +1,7 @@
-use crate::global::sources::{Chapter, Novel, NovelPreview};
+use crate::{
+    global::sources::{Chapter, Novel, NovelPreview},
+    state::book_info::ID,
+};
 use anyhow::Result;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -17,6 +20,8 @@ pub enum RequestData {
     ChapterTemp((Result<Chapter>, usize)),
     /// A chapter
     Chapter((Result<Chapter>, usize)),
+    /// Update info for a book
+    UpdateInfo((ID, Result<Novel>)),
 }
 
 /// A struct to hold the sender and reciever

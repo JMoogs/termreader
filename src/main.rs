@@ -1,7 +1,12 @@
-use crate::helpers::StatefulList;
-use crate::state::channels::RequestData;
-use appstate::{AppState, BookInfo, CurrentScreen, MiscOptions, SourceOptions};
-
+use crate::{
+    appstate::AppState,
+    helpers::StatefulList,
+    state::{
+        book_info::{BookInfo, BookSource},
+        channels::RequestData,
+        screen::{CurrentScreen, MiscOptions, SourceOptions},
+    },
+};
 use crossterm::{
     event::{self, Event},
     execute, terminal,
@@ -101,6 +106,14 @@ fn run_app<B: Backend>(
                         app_state.buffer.novel = Some(res);
 
                         app_state.update_screen(CurrentScreen::Misc(MiscOptions::ChapterView));
+                    }
+                    RequestData::UpdateInfo((id, res)) => {
+                        let res = res?;
+                        let book = app_state.library_data.find_book_mut(id).unwrap();
+                        if let BookSource::Global(ref mut data) = book.source_data {
+                            data.total_chapters = res.chapters.len();
+                            data.novel = res;
+                        };
                     }
                     RequestData::ChapterTemp((res, ch_no)) => {
                         let novel = app_state.buffer.novel.clone().unwrap();

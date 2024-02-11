@@ -1,7 +1,7 @@
 use crate::{
-    appstate::{BookInfo, BookSource},
     global::sources::Chapter,
     reader::buffer::BufferType,
+    state::book_info::{BookInfo, BookSource},
 };
 
 use self::buffer::{BookPortion, BookProgress, BookProgressData, LocalBuffer, NextDisplay};

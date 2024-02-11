@@ -1,8 +1,10 @@
-use crate::appstate::{BookSource, GlobalBookData, ID};
-use crate::global::sources::Novel;
-use crate::helpers::StatefulList;
-use crate::local::LocalBookData;
-use crate::reader::buffer::{BookProgress, BookProgressData};
+use crate::{
+    global::sources::Novel,
+    helpers::StatefulList,
+    local::LocalBookData,
+    reader::buffer::{BookProgress, BookProgressData},
+    state::book_info::{BookSource, GlobalBookData, ID},
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
