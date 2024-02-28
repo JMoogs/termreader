@@ -16,7 +16,6 @@ use ratatui::prelude::*;
 
 pub mod appstate;
 pub mod commands;
-pub mod global;
 pub mod helpers;
 pub mod local;
 pub mod logging;
@@ -93,7 +92,7 @@ fn run_app<B: Backend>(
                         let res = res?;
                         app_state.buffer.clear_novel();
                         app_state.buffer.chapter_previews =
-                            StatefulList::from(res.chapters.clone());
+                            StatefulList::from(res.get_chapters().clone());
                         app_state.buffer.novel = Some(res);
 
                         app_state.update_screen(CurrentScreen::Sources(SourceOptions::BookView));
@@ -102,7 +101,7 @@ fn run_app<B: Backend>(
                         let res = res?;
                         app_state.buffer.clear_novel();
                         app_state.buffer.chapter_previews =
-                            StatefulList::from(res.chapters.clone());
+                            StatefulList::from(res.get_chapters().clone());
                         app_state.buffer.novel = Some(res);
 
                         app_state.update_screen(CurrentScreen::Misc(MiscOptions::ChapterView));
@@ -111,7 +110,7 @@ fn run_app<B: Backend>(
                         let res = res?;
                         let book = app_state.library_data.find_book_mut(id).unwrap();
                         if let BookSource::Global(ref mut data) = book.source_data {
-                            data.total_chapters = res.chapters.len();
+                            data.total_chapters = res.get_length();
                             data.novel = res;
                         };
                     }

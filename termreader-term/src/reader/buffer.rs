@@ -348,6 +348,11 @@ pub struct BookProgressData {
 }
 
 impl BookProgressData {
+    pub const FINISHED: BookProgressData = BookProgressData {
+        total_lines: 1,
+        progress: BookProgress::Finished,
+    };
+
     pub fn new(total_lines: usize, progress: BookProgress) -> Self {
         Self {
             total_lines,

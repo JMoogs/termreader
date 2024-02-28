@@ -1,29 +1,16 @@
-[package]
+[workspace]
+resolver = "2"
+members = [
+  "termreader-sources",  
+  "termreader-term",
+]
+
+[workspace.package]
 name = "termreader"
 version = "0.1.0"
 edition = "2021"
 authors = ["Jeremy S <Jeremy@jsmoog.com>"]
 description = "A CLI ebook reader and converter"
 readme = "README.md"
-repository = "https://github.com/JMoogs/rreader"
+repository = "https://github.com/JMoogs/termreader"
 license = "MIT OR Apache-2.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-anyhow = "1.0.75"
-crossterm = "0.27.0"
-directories = "5.0.1"
-lazy_static = "1.4.0"
-ratatui = "0.24.0"
-serde = { version = "1.0.188", features = ["derive"]}
-serde_json = "1.0.107"
-sha256 = "1.4.0"
-tracing = "0.1.40"
-tracing-error = "0.2.0"
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
-reqwest = { version = "0.11.22", features = ["blocking", "multipart"]}
-scraper = "0.18.1"
-html5ever = "0.26.0"
-chrono = "0.4.31"
-regex = "1.10.2"

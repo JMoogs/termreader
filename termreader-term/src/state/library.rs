@@ -1,5 +1,4 @@
 use crate::{
-    global::sources::Novel,
     helpers::StatefulList,
     local::LocalBookData,
     reader::buffer::{BookProgress, BookProgressData},
@@ -7,6 +6,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use termreader_sources::novel::Novel;
 
 /// Data related to the user's library of novels
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -291,28 +291,13 @@ impl LibBookInfo {
         }
     }
 
-    /// Updates the progress of a book
-    pub fn update_progress(&mut self, progress: BookProgress) {
-        match &mut self.source_data {
-            BookSource::Local(ref mut data) => {
-                data.progress.progress = progress;
-            }
-            BookSource::Global(d) => {
-                let p = d.chapter_progress.get_mut(&d.current_chapter).unwrap();
-                p.progress = progress;
-            }
-        }
-    }
-
     /// Sets the progress of a book
     pub fn set_progress(&mut self, progress: BookProgressData) {
         match &mut self.source_data {
             BookSource::Local(ref mut data) => {
                 data.progress = progress;
             }
-            BookSource::Global(d) => {
-                d.chapter_progress.insert(d.current_chapter, progress);
-            }
+            BookSource::Global(d) => d.set_current_chapter_prog(progress),
         }
     }
 
@@ -321,11 +306,21 @@ impl LibBookInfo {
         match &self.source_data {
             BookSource::Local(ref data) => data.progress.progress,
             BookSource::Global(d) => {
-                let p = d.chapter_progress.get(&d.current_chapter);
+                let p = d.get_chapter_progress(d.get_current_chapter());
                 match p {
                     Some(place) => place.progress,
                     None => BookProgress::Location((0, 0)),
                 }
+            }
+        }
+    }
+
+    /// Wipes the progress of a book
+    pub fn clear_all_progress(&mut self) {
+        match &mut self.source_data {
+            BookSource::Local(data) => data.progress.progress = BookProgress::NONE,
+            BookSource::Global(d) => {
+                d.clear_all_ch_progress();
             }
         }
     }
@@ -342,11 +337,11 @@ impl LibBookInfo {
             }
             BookSource::Global(data) => {
                 let percent_through =
-                    100.0 * data.read_chapters.len() as f64 / data.total_chapters as f64;
+                    100.0 * data.get_chapters_ordered() as f64 / data.total_chapters as f64;
                 format!(
-                    "{} | Chapter: {}/{} ({:.2}%)",
+                    "{} | Chapters read: {}/{} ({:.2}%)",
                     self.name,
-                    data.read_chapters.len(),
+                    data.get_chapters_ordered(),
                     data.total_chapters,
                     percent_through,
                 )

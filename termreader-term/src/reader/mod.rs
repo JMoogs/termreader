@@ -1,8 +1,8 @@
 use crate::{
-    global::sources::Chapter,
     reader::buffer::BufferType,
     state::book_info::{BookInfo, BookSource},
 };
+use termreader_sources::chapter::Chapter;
 
 use self::buffer::{BookPortion, BookProgress, BookProgressData, LocalBuffer, NextDisplay};
 
@@ -31,7 +31,7 @@ impl ReaderData {
                 match self.book_info.get_source_data_mut() {
                     BookSource::Local(_) => unreachable!(),
                     BookSource::Global(d) => {
-                        d.read_chapters.insert(self.global_chapter);
+                        d.mark_ch_complete(self.global_chapter);
                     }
                 }
             }
@@ -72,17 +72,13 @@ impl ReaderData {
             }
             BookSource::Global(data) => {
                 let ch = chapter_no.unwrap();
-                let line = match data.chapter_progress.get(&ch) {
+                let line = match data.get_chapter_progress(ch) {
                     Some(progress) => progress.get_line(),
                     None => 0,
                 };
 
                 let text = text.unwrap();
-                let lines = text
-                    .chapter_contents
-                    .lines()
-                    .map(|l| l.to_string())
-                    .collect();
+                let lines = text.get_contents().lines().map(|l| l.to_string()).collect();
 
                 let b = BufferType::Global(lines);
 

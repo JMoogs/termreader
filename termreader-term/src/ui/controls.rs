@@ -1,9 +1,8 @@
+use crate::appstate::SourceBookBox;
 use crate::{
     appstate::AppState,
     commands::{parse_command, run_command},
-    global::sources::{source_data::SourceBookBox, Scrape, SortOrder},
     helpers::StatefulList,
-    reader::buffer::BookProgress,
     state::{
         book_info::{BookInfo, BookSource},
         channels::RequestData,
@@ -18,6 +17,7 @@ use anyhow::Result;
 use crossterm::event::{self, KeyCode};
 use ratatui::widgets::ListState;
 use std::thread;
+use termreader_sources::sources::{Scrape, SortOrder};
 
 pub fn handle_controls(app_state: &mut AppState, mut event: event::KeyCode) -> Result<bool> {
     // Command bar logic
@@ -195,7 +195,7 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
                 }
                 CurrentScreen::Sources(SourceOptions::SourceSelect) => {
                     app_state.channels.loading = true;
-                    let source = app_state.source_data.get_list().selected().unwrap().clone();
+                    let source = app_state.get_selected_source().cloned().unwrap();
                     let text = app_state.buffer.text.clone();
                     let tx = app_state.channels.get_sender();
                     app_state.channels.loading = true;
@@ -266,15 +266,17 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
                 book.get_source_data_mut().set_chapter(c);
                 let novel = book.get_novel().unwrap().clone();
                 let source = app_state
-                    .source_data
                     .get_source_by_id(book.get_source_id().unwrap())
-                    .clone();
+                    .cloned()
+                    .unwrap();
                 let tx = app_state.channels.get_sender();
 
                 app_state.channels.loading = true;
                 thread::spawn(move || {
-                    let text = source
-                        .parse_chapter(novel.novel_url.clone(), novel.get_chapter_url(c).unwrap());
+                    let text = source.parse_chapter(
+                        novel.get_url().to_string(),
+                        novel.get_chapter_url(c).unwrap(),
+                    );
                     if in_library {
                         let _ = tx.send(RequestData::Chapter((text, c)));
                     } else {
@@ -299,15 +301,16 @@ fn control_reader(app_state: &mut AppState, event: event::KeyCode) -> Result<()>
 
                 let novel = book.get_novel().unwrap().clone();
                 let source = app_state
-                    .source_data
                     .get_source_by_id(book.get_source_id().unwrap())
-                    .clone();
+                    .cloned();
                 let tx = app_state.channels.get_sender();
 
                 app_state.channels.loading = true;
                 thread::spawn(move || {
-                    let text = source
-                        .parse_chapter(novel.novel_url.clone(), novel.get_chapter_url(c).unwrap());
+                    let text = source.unwrap().parse_chapter(
+                        novel.get_url().to_string(),
+                        novel.get_chapter_url(c).unwrap(),
+                    );
                     if in_library {
                         let _ = tx.send(RequestData::Chapter((text, c)));
                     } else {
@@ -451,7 +454,7 @@ fn control_library_local_book_select(
                 }
                 3 => {
                     // Start from beginning
-                    book.update_progress(BookProgress::NONE);
+                    book.clear_all_progress();
                     app_state.move_to_reader(BookInfo::Library(book), None, None)?;
                 }
                 4 => {
@@ -492,43 +495,33 @@ fn control_library_global_book_select(
             match option {
                 // Resume
                 0 => {
-                    let ch = book.source_data.get_chapter();
-                    let progress = book.get_progress();
-                    let mut book = BookInfo::Library(book);
+                    let book = BookInfo::Library(book);
+                    let ch = {
+                        if let BookSource::Global(d) = book.get_source_data() {
+                            let ordered = d.get_chapters_ordered();
+                            if ordered + 1 > d.total_chapters {
+                                ordered
+                            } else {
+                                ordered + 1
+                            }
+                        } else {
+                            unreachable!()
+                        }
+                    };
                     let novel = book.get_novel().unwrap().clone();
                     let source = app_state
-                        .source_data
                         .get_source_by_id(book.get_source_id().unwrap())
-                        .clone();
+                        .cloned();
                     let tx = app_state.channels.get_sender();
-
-                    if matches!(progress, BookProgress::Finished) {
-                        let next = book.get_source_data().get_next_chapter();
-                        if let Some(c) = next {
-                            book.get_source_data_mut().set_chapter(c);
-
-                            app_state.channels.loading = true;
-                            thread::spawn(move || {
-                                let text = source.parse_chapter(
-                                    novel.novel_url.clone(),
-                                    novel.get_chapter_url(c).unwrap(),
-                                );
-                                let _ = tx.send(RequestData::Chapter((text, ch)));
-                            });
-                            return Ok(());
-                        }
-                    }
 
                     app_state.channels.loading = true;
                     thread::spawn(move || {
-                        let text = source.parse_chapter(
-                            novel.novel_url.clone(),
+                        let text = source.unwrap().parse_chapter(
+                            novel.get_url().to_string(),
                             novel.get_chapter_url(ch).unwrap(),
                         );
                         let _ = tx.send(RequestData::Chapter((text, ch)));
                     });
-
-                    // app_state.move_to_reader(book, Some(ch))?;
                 }
                 // Chapter List
                 1 => {
@@ -539,7 +532,8 @@ fn control_library_global_book_select(
                     };
 
                     app_state.buffer.ch_list_setup();
-                    app_state.buffer.chapter_previews = StatefulList::from(novel.chapters.clone());
+                    app_state.buffer.chapter_previews =
+                        StatefulList::from(novel.get_chapters().clone());
                     app_state.buffer.novel = Some(novel);
 
                     app_state.update_screen(CurrentScreen::Misc(MiscOptions::ChapterView));
@@ -562,15 +556,15 @@ fn control_library_global_book_select(
 
                     let novel = book.get_novel().unwrap().clone();
                     let source = app_state
-                        .source_data
                         .get_source_by_id(book.get_source_id().unwrap())
+                        .unwrap()
                         .clone();
                     let tx = app_state.channels.get_sender();
 
                     app_state.channels.loading = true;
                     thread::spawn(move || {
                         let text = source.parse_chapter(
-                            novel.novel_url.clone(),
+                            novel.get_url().to_string(),
                             novel.get_chapter_url(1).unwrap(),
                         );
                         let _ = tx.send(RequestData::Chapter((text, 1)));
@@ -709,15 +703,14 @@ fn control_chapter_view(app_state: &mut AppState, event: event::KeyCode) -> Resu
                 let book = BookInfo::Library(book);
                 let novel = book.get_novel().unwrap().clone();
                 let source = app_state
-                    .source_data
                     .get_source_by_id(book.get_source_id().unwrap())
-                    .clone();
+                    .cloned();
                 let tx = app_state.channels.get_sender();
                 app_state.channels.loading = true;
 
                 thread::spawn(move || {
-                    let text = source.parse_chapter(
-                        novel.novel_url.clone(),
+                    let text = source.unwrap().parse_chapter(
+                        novel.get_url().to_string(),
                         novel.get_chapter_url(chap + 1).unwrap(),
                     );
                     let _ = tx.send(RequestData::Chapter((text, chap + 1)));
@@ -739,13 +732,13 @@ fn control_chapter_view(app_state: &mut AppState, event: event::KeyCode) -> Resu
 fn control_sources_menu(app_state: &mut AppState, event: event::KeyCode) {
     match event {
         KeyCode::Up => {
-            app_state.source_data.get_list_mut().previous();
+            app_state.source_data.previous();
         }
         KeyCode::Down => {
-            app_state.source_data.get_list_mut().next();
+            app_state.source_data.next();
         }
         KeyCode::Enter => {
-            let source = app_state.source_data.get_list().selected();
+            let source = app_state.source_data.selected();
             if source.is_some() {
                 app_state.update_screen(CurrentScreen::Sources(SourceOptions::SourceSelect));
             }
@@ -772,7 +765,7 @@ fn control_source_select(app_state: &mut AppState, event: event::KeyCode) -> Res
                 }
                 1 => {
                     app_state.channels.loading = true;
-                    let source = app_state.source_data.get_list().selected().unwrap().clone();
+                    let source = app_state.get_selected_source().cloned().unwrap();
                     let tx = app_state.channels.get_sender();
                     app_state.channels.loading = true;
                     thread::spawn(move || {
@@ -841,13 +834,13 @@ fn control_source_book_view(app_state: &mut AppState, event: event::KeyCode) -> 
                         // Start from beginning
                         0 => {
                             let novel = app_state.buffer.novel.clone().unwrap();
-                            let source = app_state.source_data.sources.selected().unwrap().clone();
+                            let source = app_state.get_selected_source().cloned().unwrap();
                             let tx = app_state.channels.get_sender();
                             app_state.channels.loading = true;
 
                             thread::spawn(move || {
                                 let text = source.parse_chapter(
-                                    novel.novel_url.clone(),
+                                    novel.get_url().to_string(),
                                     novel.get_chapter_url(1).unwrap(),
                                 );
                                 let _ = tx.send(RequestData::ChapterTemp((text, 1)));
@@ -872,24 +865,24 @@ fn control_source_book_view(app_state: &mut AppState, event: event::KeyCode) -> 
                         .unwrap()
                         .clone();
                     let novel = app_state.buffer.novel.clone().unwrap();
-                    let mut info = BookInfo::from_novel_temp(novel, chap.chapter_no)?;
-                    info.get_source_data_mut().set_chapter(chap.chapter_no);
+                    let mut info = BookInfo::from_novel_temp(novel, chap.get_chapter_no())?;
+                    info.get_source_data_mut()
+                        .set_chapter(chap.get_chapter_no());
                     // Yes, this is necessary
                     let novel = info.get_novel().unwrap().clone();
 
                     let source = app_state
-                        .source_data
                         .get_source_by_id(info.get_source_id().unwrap())
-                        .clone();
+                        .cloned();
                     let tx = app_state.channels.get_sender();
                     app_state.channels.loading = true;
 
                     thread::spawn(move || {
-                        let text = source.parse_chapter(
-                            novel.novel_url.clone(),
-                            novel.get_chapter_url(chap.chapter_no).unwrap(),
+                        let text = source.unwrap().parse_chapter(
+                            novel.get_url().to_string(),
+                            novel.get_chapter_url(chap.get_chapter_no()).unwrap(),
                         );
-                        let _ = tx.send(RequestData::ChapterTemp((text, chap.chapter_no)));
+                        let _ = tx.send(RequestData::ChapterTemp((text, chap.get_chapter_no())));
                     });
 
                     // app_state.move_to_reader(info, Some(chap.chapter_no))?;
@@ -912,9 +905,9 @@ fn control_source_search_result(app_state: &mut AppState, event: event::KeyCode)
                 .novel_previews
                 .selected()
                 .unwrap()
-                .url
-                .clone();
-            let source = app_state.source_data.sources.selected().unwrap().clone();
+                .get_url()
+                .to_string();
+            let source = app_state.get_selected_source().cloned().unwrap();
             let tx = app_state.channels.get_sender();
 
             app_state.channels.loading = true;
@@ -947,7 +940,7 @@ fn control_history_global_book_select(
                 return Ok(());
             }
 
-            let mut book = app_state.history_data.history[idx.unwrap()].book.clone();
+            let book = app_state.history_data.history[idx.unwrap()].book.clone();
 
             match option {
                 0 => {
@@ -955,36 +948,29 @@ fn control_history_global_book_select(
 
                     let is_lib_book = matches!(book, BookInfo::Library(_));
 
-                    let ch = book.get_source_data().get_chapter();
-                    let progress = book.get_progress();
+                    let ch = {
+                        if let BookSource::Global(d) = book.get_source_data() {
+                            let ordered = d.get_chapters_ordered();
+                            if ordered + 1 > d.total_chapters {
+                                ordered
+                            } else {
+                                ordered + 1
+                            }
+                        } else {
+                            unreachable!()
+                        }
+                    };
                     let novel = book.get_novel().unwrap().clone();
                     let source = app_state
-                        .source_data
                         .get_source_by_id(book.get_source_id().unwrap())
+                        .unwrap()
                         .clone();
                     let tx = app_state.channels.get_sender();
-
-                    if matches!(progress, BookProgress::Finished) {
-                        let next = book.get_source_data().get_next_chapter();
-                        if let Some(c) = next {
-                            book.get_source_data_mut().set_chapter(c);
-
-                            app_state.channels.loading = true;
-                            thread::spawn(move || {
-                                let text = source.parse_chapter(
-                                    novel.novel_url.clone(),
-                                    novel.get_chapter_url(c).unwrap(),
-                                );
-                                let _ = tx.send(RequestData::Chapter((text, ch)));
-                            });
-                            return Ok(());
-                        }
-                    }
 
                     app_state.channels.loading = true;
                     thread::spawn(move || {
                         let text = source.parse_chapter(
-                            novel.novel_url.clone(),
+                            novel.get_url().to_string(),
                             novel.get_chapter_url(ch).unwrap(),
                         );
                         if is_lib_book {
@@ -997,15 +983,16 @@ fn control_history_global_book_select(
                 1 => {
                     // View book
                     let source = app_state
-                        .source_data
                         .get_source_by_id(book.get_source_id().unwrap())
+                        .unwrap()
                         .clone();
                     let tx = app_state.channels.get_sender();
 
                     app_state.channels.loading = true;
                     thread::spawn(move || {
-                        let novel = source
-                            .parse_novel_and_chapters(book.get_novel().unwrap().novel_url.clone());
+                        let novel = source.parse_novel_and_chapters(
+                            book.get_novel().unwrap().get_url().to_string(),
+                        );
                         let _ = tx.send(RequestData::BookInfoNoOpts(novel));
                     });
                 }

@@ -1,8 +1,8 @@
+use crate::appstate::SourceBookBox;
 use ratatui::{prelude::*, widgets::*};
 
 use crate::{
-    appstate::AppState, global::sources::source_data::SourceBookBox,
-    ui::helpers::centered_sized_rect, SELECTED_STYLE, UNSELECTED_STYLE,
+    appstate::AppState, ui::helpers::centered_sized_rect, SELECTED_STYLE, UNSELECTED_STYLE,
 };
 
 pub fn render_local_selection(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
@@ -179,10 +179,10 @@ pub fn render_ch_list(app_state: &mut AppState, f: &mut Frame) {
 
     let novel = app_state.buffer.novel.as_ref().unwrap();
 
-    let synopsis = novel.synopsis();
+    let synopsis = novel.get_synopsis();
 
     // The title
-    let title = Paragraph::new(novel.name.clone())
+    let title = Paragraph::new(novel.get_name())
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -220,7 +220,10 @@ pub fn render_ch_list(app_state: &mut AppState, f: &mut Frame) {
 
     let list: Vec<ListItem> = chapters
         .into_iter()
-        .map(|i| ListItem::new(format!("{}: {}", i.chapter_no, i.name)).style(UNSELECTED_STYLE))
+        .map(|i| {
+            ListItem::new(format!("{}: {}", i.get_chapter_no(), i.get_name()))
+                .style(UNSELECTED_STYLE)
+        })
         .collect();
 
     let ch_count = list.len();

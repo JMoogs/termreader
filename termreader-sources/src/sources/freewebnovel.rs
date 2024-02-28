@@ -1,10 +1,8 @@
-use super::{
-    get_html, Chapter, ChapterPreview, Novel, NovelPreview, NovelStatus, Scrape, SortOrder,
-    SourceID,
-};
+use super::{Scrape, SortOrder, SourceID};
+use crate::chapter::{Chapter, ChapterPreview};
+use crate::get_html;
+use crate::novel::{Novel, NovelPreview, NovelStatus};
 use anyhow::Result;
-// use chrono::Local;
-// use html5ever::tree_builder::TreeSink;
 use regex::Regex;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};

@@ -1,4 +1,3 @@
-use crate::global::sources::Chapter;
 use crate::reader::ReaderData;
 use crate::state::{
     book_info::{BookInfo, BookSource},
@@ -10,12 +9,15 @@ use crate::state::{
     screen::{CurrentScreen, HistoryOptions, LibraryOptions, SourceOptions},
 };
 use crate::{
-    global::sources::source_data::SourceData,
     helpers::{CategoryTabs, StatefulList},
     startup,
 };
 use anyhow::Result;
 use std::time::SystemTime;
+use termreader_sources::{
+    chapter::Chapter,
+    sources::{Source, SourceID, Sources},
+};
 
 pub struct AppState {
     /// Stores the current screen that is being rendered.
@@ -32,8 +34,10 @@ pub struct AppState {
     pub history_data: HistoryData,
     /// Contains all the options for all possible lists, and their states
     pub menu_options: MenuOptions,
+    /// The internal sources
+    sources: Sources,
     /// Contains data about the currently accessed source
-    pub source_data: SourceData,
+    pub source_data: StatefulList<(SourceID, String)>,
     /// Buffers to store any temporary data
     pub buffer: AppBuffer,
     /// Contains senders/recievers for the channel, used for any synchronous operations
@@ -93,6 +97,8 @@ impl AppState {
 
         let cats = library_data.categories.items.clone();
 
+        let sources = Sources::build();
+
         Ok(Self {
             current_screen: CurrentScreen::Library(LibraryOptions::Default),
             prev_screens: Vec::new(),
@@ -101,7 +107,8 @@ impl AppState {
             history_data,
             reader_data: None,
             menu_options: MenuOptions::new(cats),
-            source_data: SourceData::build(),
+            sources: sources.clone(),
+            source_data: StatefulList::from(sources.get_source_info()),
             buffer: AppBuffer::default(),
             channels: ChannelData::new(),
             command_bar: false,
@@ -189,4 +196,24 @@ impl AppState {
         self.menu_options.source_book_options.select_first();
         self.menu_options.category_options.select_first();
     }
+
+    pub fn get_source_by_id(&self, id: &SourceID) -> Option<&Source> {
+        self.sources.get_source_by_id(id)
+    }
+
+    pub fn get_selected_source(&self) -> Option<&Source> {
+        let selected_id = self.source_data.selected();
+        match selected_id {
+            Some((id, _)) => self.get_source_by_id(id),
+            None => None,
+        }
+    }
+}
+
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
+pub enum SourceBookBox {
+    #[default]
+    Options,
+    Chapters,
+    Summary,
 }

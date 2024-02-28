@@ -8,7 +8,7 @@ pub mod helpers;
 pub mod mainscreen;
 pub mod reader;
 
-fn render_loading_popup(f: &mut Frame) {
+fn render_loading_popup(rect: Rect, f: &mut Frame) {
     let para = Paragraph::new("Loading...")
         .style(Style::new().add_modifier(Modifier::BOLD))
         .block(
@@ -17,5 +17,5 @@ fn render_loading_popup(f: &mut Frame) {
                 .border_type(BorderType::Rounded),
         );
 
-    f.render_widget(para, f.size())
+    f.render_widget(para, rect)
 }

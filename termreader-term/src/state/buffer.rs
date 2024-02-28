@@ -1,7 +1,7 @@
-use crate::{
-    global::sources::{source_data::SourceBookBox, ChapterPreview, Novel, NovelPreview},
-    helpers::StatefulList,
-};
+use crate::appstate::SourceBookBox;
+use crate::helpers::StatefulList;
+use termreader_sources::chapter::ChapterPreview;
+use termreader_sources::novel::{Novel, NovelPreview};
 
 /// A buffer for storing any temporary data
 #[derive(Debug, Clone, Default)]

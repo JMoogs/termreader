@@ -20,8 +20,7 @@ use super::{
 
 pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
     if app_state.channels.loading {
-        render_loading_popup(f);
-        return;
+        render_loading_popup(f.size(), f);
     }
 
     if matches!(
@@ -195,11 +194,10 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         .constraints([Constraint::Min(1)])
         .split(rect);
 
-    let display_data: Vec<ListItem> = app_state
-        .source_data
-        .get_source_names()
+    let items = app_state.source_data.clone().to_vec();
+    let display_data: Vec<ListItem> = items
         .into_iter()
-        .map(|f| ListItem::new(f).style(UNSELECTED_STYLE))
+        .map(|(_, f)| ListItem::new(f).style(UNSELECTED_STYLE))
         .collect();
 
     let sources = List::new(display_data)
@@ -215,11 +213,7 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     if let CurrentScreen::Sources(SourceOptions::SearchResults) = app_state.current_screen {
         render_search_results(chunks[0], app_state, f, "Results");
     } else {
-        f.render_stateful_widget(
-            sources,
-            chunks[0],
-            app_state.source_data.sources.state_mut(),
-        );
+        f.render_stateful_widget(sources, chunks[0], app_state.source_data.state_mut());
     }
 
     if let CurrentScreen::Sources(SourceOptions::SourceSelect) = app_state.current_screen {

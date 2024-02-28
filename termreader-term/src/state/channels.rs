@@ -1,9 +1,10 @@
-use crate::{
-    global::sources::{Chapter, Novel, NovelPreview},
-    state::book_info::ID,
-};
+use crate::state::book_info::ID;
 use anyhow::Result;
 use std::sync::mpsc::{Receiver, Sender};
+use termreader_sources::{
+    chapter::Chapter,
+    novel::{Novel, NovelPreview},
+};
 
 /// Contains all the possible requests that can be made through channels.
 /// These are requests that need to happen synchronously

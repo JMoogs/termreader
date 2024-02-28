@@ -1,6 +1,7 @@
 use crate::{
-    appstate::AppState, global::sources::source_data::SourceBookBox,
-    ui::helpers::centered_sized_rect, SELECTED_STYLE, UNSELECTED_STYLE,
+    appstate::{AppState, SourceBookBox},
+    ui::helpers::centered_sized_rect,
+    SELECTED_STYLE, UNSELECTED_STYLE,
 };
 use ratatui::{prelude::*, widgets::*};
 
@@ -50,8 +51,9 @@ pub fn render_search_results(
         .buffer
         .novel_previews
         .items
-        .iter()
-        .map(|f| ListItem::new(f.name.clone()).style(UNSELECTED_STYLE))
+        .clone()
+        .into_iter()
+        .map(|f| ListItem::new(f.get_name().to_string()).style(UNSELECTED_STYLE))
         .collect();
 
     let results = List::new(display)
@@ -92,7 +94,7 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
     let novel = app_state.buffer.novel.as_ref().unwrap();
 
     // The title
-    let title = Paragraph::new(novel.name.clone())
+    let title = Paragraph::new(novel.get_name())
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -112,12 +114,12 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
         .style(SELECTED_STYLE);
     // Synopsis
     let synopsis = if app_state.buffer.novel_preview_selection == SourceBookBox::Summary {
-        Paragraph::new(novel.synopsis())
+        Paragraph::new(novel.get_synopsis())
             .block(selected_block)
             .wrap(Wrap { trim: true })
             .scroll((app_state.buffer.novel_preview_scroll as u16, 0))
     } else {
-        Paragraph::new(novel.synopsis())
+        Paragraph::new(novel.get_synopsis())
             .block(unselected_block)
             .wrap(Wrap { trim: true })
             .scroll((app_state.buffer.novel_preview_scroll as u16, 0))
@@ -164,11 +166,20 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
 
     // Chapters
 
-    let chapters = app_state.buffer.novel.clone().unwrap().chapters;
+    let chapters = app_state
+        .buffer
+        .novel
+        .as_ref()
+        .unwrap()
+        .get_chapters()
+        .clone();
 
     let list: Vec<ListItem> = chapters
         .into_iter()
-        .map(|i| ListItem::new(format!("{}: {}", i.chapter_no, i.name)).style(UNSELECTED_STYLE))
+        .map(|i| {
+            ListItem::new(format!("{}: {}", i.get_chapter_no(), i.get_name()))
+                .style(UNSELECTED_STYLE)
+        })
         .collect();
 
     let ch_count = list.len();

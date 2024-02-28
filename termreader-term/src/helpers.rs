@@ -128,6 +128,11 @@ impl<T> StatefulList<T> {
             self.state.select(Some(i));
         }
     }
+
+    /// Converts the list back to a vector, losing state.
+    pub fn to_vec(self) -> Vec<T> {
+        self.items
+    }
 }
 
 /// A struct to store the list of categories.

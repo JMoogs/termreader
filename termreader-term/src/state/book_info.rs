@@ -1,15 +1,13 @@
 use crate::{
-    global::sources::{source_data::Source, Novel, Scrape, SourceID},
     local::LocalBookData,
     reader::buffer::{BookProgress, BookProgressData},
     state::library::LibBookInfo,
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    time::SystemTime,
-};
+use std::{collections::HashMap, time::SystemTime};
+use termreader_sources::novel::Novel;
+use termreader_sources::sources::{Scrape, Source, SourceID};
 
 /// An ID used to uniquely identify a book.
 /// Determined using the current timestamp, resulting in very little risk of collisions.
@@ -42,7 +40,7 @@ pub enum BookInfo {
 impl BookInfo {
     /// Creates an instance of `BookInfo` from a `Novel`
     pub fn from_novel_temp(novel: Novel, ch: usize) -> Result<Self, anyhow::Error> {
-        let name = novel.name.clone();
+        let name = novel.get_name().to_string();
         let source = BookSource::Global(GlobalBookData::create(novel, ch));
 
         Ok(BookInfo::Reader(ReaderBookInfo {
@@ -86,10 +84,10 @@ impl BookInfo {
         }
     }
 
-    pub fn get_source_id(&self) -> Option<SourceID> {
+    pub fn get_source_id(&self) -> Option<&SourceID> {
         match self.get_source_data() {
             BookSource::Local(_) => None,
-            BookSource::Global(d) => Some(d.novel.source),
+            BookSource::Global(d) => Some(d.novel.get_source()),
         }
     }
 
@@ -220,10 +218,10 @@ impl BookSource {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GlobalBookData {
     pub name: String,
-    pub read_chapters: HashSet<usize>,
-    pub current_chapter: usize,
+    chapters_read_ordered: usize,
+    current_chapter: usize,
     pub total_chapters: usize,
-    pub chapter_progress: HashMap<usize, BookProgressData>,
+    chapter_progress: HashMap<usize, BookProgressData>,
     pub novel: Novel,
 }
 
@@ -236,17 +234,72 @@ impl PartialEq for GlobalBookData {
 impl GlobalBookData {
     pub fn create(novel: Novel, ch: usize) -> Self {
         Self {
-            name: novel.name.clone(),
-            read_chapters: HashSet::new(),
+            name: novel.get_name().to_string(),
+            chapters_read_ordered: 0,
             current_chapter: ch,
-            total_chapters: novel.chapters.len(),
+            total_chapters: novel.get_length(),
             chapter_progress: HashMap::new(),
             novel,
         }
     }
 
     pub fn update(&mut self, source: &Source) -> Result<Novel> {
-        source.parse_novel_and_chapters(self.novel.novel_url.clone())
+        source.parse_novel_and_chapters(self.novel.get_url().to_string())
+    }
+
+    pub fn set_current_chapter(&mut self, chapter: usize) {
+        self.current_chapter = chapter;
+    }
+
+    pub fn set_current_chapter_prog(&mut self, progress: BookProgressData) {
+        self.chapter_progress.insert(self.current_chapter, progress);
+    }
+
+    pub fn get_current_chapter(&self) -> usize {
+        self.current_chapter
+    }
+
+    pub fn mark_ch_complete(&mut self, chapter: usize) {
+        if chapter <= self.total_chapters {
+            self.chapter_progress
+                .insert(chapter, BookProgressData::FINISHED);
+            self.update_ordered_chapters()
+        }
+    }
+
+    fn update_ordered_chapters(&mut self) {
+        loop {
+            let next_ch = self.chapter_progress.get(&(self.chapters_read_ordered + 1));
+            if next_ch.is_none() {
+                break;
+            }
+            if next_ch.unwrap().progress != BookProgress::FINISHED {
+                break;
+            }
+            self.chapters_read_ordered += 1;
+        }
+    }
+
+    pub fn get_chapters_ordered(&self) -> usize {
+        self.chapters_read_ordered
+    }
+
+    pub fn get_chapter_progress(&self, chapter: usize) -> Option<BookProgressData> {
+        self.chapter_progress.get(&chapter).cloned()
+    }
+
+    pub fn set_chapter_progress(&mut self, chapter: usize, progress: BookProgressData) {
+        if chapter <= self.total_chapters {
+            self.chapter_progress.insert(chapter, progress);
+        }
+    }
+
+    pub fn clear_ch_progress(&mut self, chapter: usize) {
+        self.chapter_progress.remove(&chapter);
+    }
+
+    pub fn clear_all_ch_progress(&mut self) {
+        self.chapter_progress = HashMap::new();
     }
 }
 
