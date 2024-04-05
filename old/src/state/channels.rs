@@ -1,8 +1,6 @@
-// This module is responsible for sending requests accross threads.
-// This is used to allow the program to operate as normal while making a (blocking) web request.
-// This is required as async is not used.
 use anyhow::Result;
 use std::sync::mpsc::{Receiver, Sender};
+use termreader_core::book::Book;
 use termreader_core::id::ID;
 use termreader_sources::{
     chapter::Chapter,
@@ -14,20 +12,18 @@ use termreader_sources::{
 pub enum RequestData {
     /// The results of a search
     SearchResults(Result<Vec<NovelPreview>>),
-    /// Info about a novel. The bool signifies whether or not to show an options menu.
+    /// Info about a novel
     BookInfo((Result<Novel>, bool)),
-    /// A chapter and it's number (TODO: Add chapter number details to chapters if possible)
+    /// A chapter
     Chapter((ID, Result<Chapter>, usize)),
-    // /// Update info for a book
-    // Updated(Book),
+    /// Update info for a book
+    Updated(Book),
 }
 
+/// A struct to hold the sender and reciever
 pub struct ChannelData {
-    /// The sender
     sender: Sender<RequestData>,
-    /// A reciever that may be cloned to send data through
     pub reciever: Receiver<RequestData>,
-    /// Whether or not a request has been made
     pub loading: bool,
 }
 

@@ -1,350 +1,149 @@
-use crate::{
-    helpers::StatefulList,
-    local::LocalBookData,
-    reader::buffer::{BookProgress, BookProgressData},
-    state::book_info::{BookSource, GlobalBookData, ID},
-};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use termreader_sources::novel::Novel;
+// This module contains data related to the library tab of the TUI.
 
-/// Data related to the user's library of novels
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct LibraryData {
-    /// The string contains the category name, and the stateful list contains all books under the aforementioned category
-    pub books: HashMap<String, StatefulList<LibBookInfo>>,
-    /// The name of the default category
-    pub default_category_name: String,
-    /// A list of all the categories. This list manages which is selected
-    pub categories: StatefulList<String>,
+use crossterm::style::ContentStyle;
+use ratatui::widgets::ListState;
+use termreader_core::{book::Book, Context};
+
+use crate::helpers::StatefulList;
+
+/// Data related to the library tab
+pub struct LibData {
+    /// The index of the currently selected category
+    current_category_idx: usize,
+    /// The currently selected book. Resets upon swapping categories.
+    selected_book: ListState,
+    /// Options for a selected global book
+    pub global_selected_book_opts: StatefulList<String>,
 }
 
-impl LibraryData {
-    /// Creates an empty library
-    pub fn empty() -> Self {
-        let default_name = String::from("Default");
-        let mut map = HashMap::new();
-        map.insert(default_name.clone(), StatefulList::new());
-
-        Self {
-            books: map,
-            default_category_name: default_name.clone(),
-            categories: StatefulList::with_item(default_name),
-        }
-    }
-
-    /// Moves a book to a category.
-    /// If `None` is passed in as the category name, or the category name isn't recognized, the book is moved to the default category
-    pub fn move_category(&mut self, id: ID, category_name: Option<String>) {
-        let book = self.find_book(id).unwrap().clone();
-        self.remove_book(id);
-        self.add_book(book, category_name);
-    }
-
-    /// Creates a new category
-    pub fn create_category(&mut self, name: String) {
-        // Don't allow two categories with the same name.
-        if self.books.contains_key(&name) {
-            return;
-        }
-        self.books.insert(name.clone(), StatefulList::new());
-        self.categories.items.push(name)
-    }
-
-    /// Renames a category
-    pub fn rename_category(&mut self, old_name: String, new_name: String) {
-        if let Some(v) = self.books.remove(&old_name) {
-            if self.default_category_name == old_name {
-                self.default_category_name = new_name.clone();
-            }
-
-            let pos = self
-                .categories
-                .items
-                .iter()
-                .position(|r| r == &old_name)
-                .unwrap();
-
-            self.categories.items.remove(pos);
-            self.categories.items.insert(pos, new_name.clone());
-
-            self.books.insert(new_name, v);
-        }
-    }
-
-    /// Deletes a category. The default category cannot be deleted, meaning a category will always exist
-    pub fn delete_category(&mut self, name: String) {
-        // Don't allow the user to delete the default category: it can only be renamed.
-        if self.default_category_name == name {
-            return;
-        }
-
-        if let Some(mut v) = self.books.remove(&name) {
-            let pos = self
-                .categories
-                .items
-                .iter()
-                .position(|r| r == &name)
-                .unwrap();
-            // If the category being deleted is removed, set the selection to the first category, that will always exist.
-            if pos == self.categories.selected_idx().unwrap() {
-                self.categories.select_first()
-            }
-            self.categories.items.remove(pos);
-
-            let default_list = self.books.get_mut(&self.default_category_name).unwrap();
-
-            default_list.items.append(&mut v.items)
-        }
-    }
-
-    /// Adds a book to a category, adding the default of the category isn't recognized.
-    pub fn add_book(&mut self, mut book: LibBookInfo, category: Option<String>) {
-        let (list, cat_exists) = match category {
-            Some(ref cat) => match self.books.get_mut(cat) {
-                Some(l) => (l, true),
-                None => (
-                    self.books.get_mut(&self.default_category_name).unwrap(),
-                    false,
-                ),
-            },
-            None => (
-                self.books.get_mut(&self.default_category_name).unwrap(),
-                false,
-            ),
+impl LibData {
+    /// Creates an instance of LibData
+    pub(super) fn build(ctx: &Context) -> Self {
+        let cat_name = &ctx.lib_get_categories()[0];
+        let selected_book = if ctx
+            .lib_get_books()
+            .get(cat_name)
+            .expect("The first category should always exist but does not")
+            .is_empty()
+        {
+            ListState::default()
+        } else {
+            ListState::default().with_selected(Some(0))
         };
 
-        if cat_exists {
-            book.category = category;
-        } else {
-            book.category = None;
-        }
-        list.items.push(book);
-
-        if list.items.len() == 1 {
-            list.select_first();
-        }
-    }
-
-    /// Removes a book from the library
-    pub fn remove_book(&mut self, id: ID) {
-        let lists = self.books.values_mut();
-
-        for list in lists {
-            let search = list.items.iter().position(|i| i.id == id);
-            if search.is_none() {
-                continue;
-            }
-
-            let pos = search.unwrap();
-
-            let sel = list.selected_idx().unwrap();
-
-            list.items.remove(pos);
-
-            if sel == pos {
-                if !list.items.is_empty() {
-                    list.select_first();
-                } else {
-                    list.unselect();
-                }
-            }
-        }
-    }
-
-    /// Renames a book
-    pub fn rename_book(&mut self, id: ID, new_name: String) {
-        let book = self.find_book_mut(id);
-
-        if book.is_none() {
-            return;
-        }
-
-        let book = book.unwrap();
-        book.name = new_name.clone();
-
-        match &mut book.source_data {
-            BookSource::Local(d) => d.name = new_name,
-            BookSource::Global(d) => d.name = new_name,
-        }
-    }
-
-    /// Given an ID, returns a reference to the book
-    pub fn find_book(&self, id: ID) -> Option<&LibBookInfo> {
-        let lists = self.books.values();
-
-        for list in lists {
-            let search = list.items.iter().find(|i| i.id == id);
-            if search.is_none() {
-                continue;
-            }
-            let res = search.unwrap();
-            return Some(res);
-        }
-
-        None
-    }
-
-    /// Given an ID, returns a mutable reference to the book
-    pub fn find_book_mut(&mut self, id: ID) -> Option<&mut LibBookInfo> {
-        let lists = self.books.values_mut();
-
-        for list in lists {
-            let search = list.items.iter_mut().find(|i| i.id == id);
-            if search.is_none() {
-                continue;
-            }
-            let res = search.unwrap();
-            return Some(res);
-        }
-
-        None
-    }
-
-    /// Returns a reference to the list of books in the currently selected category
-    pub fn get_category_list(&self) -> &StatefulList<LibBookInfo> {
-        let idx = self.categories.selected_idx().unwrap();
-
-        let name = &self.categories.items[idx];
-
-        match self.books.get(name) {
-            Some(books) => books,
-            None => panic!("This should never happen"),
-        }
-    }
-
-    /// Returns a mutable reference to the list of books in the currently selected category
-    pub fn get_category_list_mut(&mut self) -> &mut StatefulList<LibBookInfo> {
-        let idx = self.categories.selected_idx().unwrap();
-
-        let name = &self.categories.items[idx];
-
-        match self.books.get_mut(name) {
-            Some(books) => books,
-            None => panic!("This should never happen"),
-        }
-    }
-}
-
-/// Contains info about a book that is in a user's library
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LibBookInfo {
-    /// The name of the book
-    pub name: String,
-    /// Information about the source
-    pub source_data: BookSource,
-    /// The category name of which the book is in. None implies that it is in the default category
-    pub category: Option<String>,
-    /// The unique ID of the book
-    pub id: ID,
-}
-
-impl PartialEq for LibBookInfo {
-    // Only IDs need to be compared - we only want to check if it's the same book, not if all the properties are the same
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl LibBookInfo {
-    /// Returns true when the source is local
-    pub fn is_local(&self) -> bool {
-        matches!(self.source_data, BookSource::Local(_))
-    }
-
-    /// Creates an instance of `LibBookInfo` from a path to a local source file.
-    pub fn from_local(
-        path: impl Into<String>,
-        category: Option<String>,
-    ) -> Result<Self, anyhow::Error> {
-        let data = LocalBookData::create(path)?;
-
-        let source = BookSource::Local(data);
-
-        Ok(Self {
-            name: source.get_name(),
-            source_data: source,
-            category,
-            id: ID::generate(),
-        })
-    }
-
-    /// Creates an instance from a novel
-    pub fn from_global(novel: Novel, category: Option<String>) -> Result<Self, anyhow::Error> {
-        let data = GlobalBookData::create(novel, 1);
-        let source = BookSource::Global(data);
-        Ok(Self {
-            name: source.get_name(),
-            source_data: source,
-            category,
-            id: ID::generate(),
-        })
-    }
-
-    /// Creates an instance of `LibBookInfo`
-    pub fn new(source_data: BookSource, category: Option<String>) -> Self {
         Self {
-            name: source_data.get_name(),
-            source_data,
-            category,
-            id: ID::generate(),
+            current_category_idx: 0, // There is always at least 1 category so this is always valid
+            selected_book,
+            global_selected_book_opts: StatefulList::from(vec![
+                String::from("Continue reading"),
+                String::from("View chapter list"),
+                String::from("Move to category..."),
+                String::from("Rename"),
+                String::from("Start from beginning"),
+                String::from("Remove book from library"),
+            ]),
         }
     }
 
-    /// Sets the progress of a book
-    pub fn set_progress(&mut self, progress: BookProgressData) {
-        match &mut self.source_data {
-            BookSource::Local(ref mut data) => {
-                data.progress = progress;
+    /// Get the currently selected category. This function will always return a valid index
+    pub fn get_selected_category(&self) -> usize {
+        return self.current_category_idx;
+    }
+
+    /// Selects the next category, wrapping around as required
+    pub fn select_next_category(&mut self, ctx: &Context) {
+        let list_len = ctx.lib_get_categories().len();
+        self.current_category_idx = (self.current_category_idx + 1) % list_len;
+
+        self.selected_book.select(None);
+        self.fix_book_selection_state(ctx);
+    }
+
+    /// Selects the previous category, wrapping around as required
+    pub fn select_previous_category(&mut self, ctx: &Context) {
+        let max_idx = ctx.lib_get_categories().len() - 1;
+        if self.current_category_idx == 0 {
+            self.current_category_idx = max_idx;
+        } else {
+            self.current_category_idx -= 1;
+        }
+
+        self.selected_book.select(None);
+        self.fix_book_selection_state(ctx);
+    }
+
+    /// Selects the first book if none is selected, and there is a book in the current category
+    pub fn fix_book_selection_state(&mut self, ctx: &Context) {
+        if self.get_current_category_size(ctx) > 0 && self.selected_book.selected().is_none() {
+            self.selected_book.select(Some(0))
+        }
+    }
+
+    /// Returns the size of the currently selected category
+    pub fn get_current_category_size(&mut self, ctx: &Context) -> usize {
+        let cat_name = &ctx.lib_get_categories()[self.get_selected_category()];
+        ctx.lib_get_books().get(cat_name).unwrap().len()
+    }
+
+    /// Returns a mutable reference to the state representing the selected book. This will always succeed
+    pub fn get_selected_book_state_mut(&mut self) -> &mut ListState {
+        &mut self.selected_book
+    }
+
+    /// Gets the currently selected book
+    pub fn get_selected_book<'a>(&self, ctx: &'a Context) -> Option<&'a Book> {
+        let idx = self.selected_book.selected()?;
+        let category_name = ctx.lib_get_categories().get(self.get_selected_category())?;
+
+        Some(&ctx.lib_get_books().get(category_name)?[idx])
+    }
+
+    /// Gets the currently selected book mutably
+    pub fn get_selected_book_mut<'a>(&self, ctx: &'a mut Context) -> Option<&'a mut Book> {
+        let idx = self.selected_book.selected()?;
+        let category_name = ctx
+            .lib_get_categories()
+            .get(self.get_selected_category())?
+            .to_string();
+
+        Some(&mut ctx.lib_get_books_mut().get_mut(&category_name)?[idx])
+    }
+
+    /// Selects the next book in the currently selected category. If no book is selected, the first book is selected
+    pub fn select_next_book(&mut self, ctx: &Context) {
+        let size = self.get_current_category_size(ctx);
+        match self.selected_book.selected() {
+            Some(n) => {
+                // If a book is selected it is certain there is at least 1 book in the category.
+                self.selected_book.select(Some((n + 1) % size))
             }
-            BookSource::Global(d) => d.set_current_chapter_prog(progress),
-        }
-    }
-
-    /// Gets the progress of a book
-    pub fn get_progress(&self) -> BookProgress {
-        match &self.source_data {
-            BookSource::Local(ref data) => data.progress.progress,
-            BookSource::Global(d) => {
-                let p = d.get_chapter_progress(d.get_current_chapter());
-                match p {
-                    Some(place) => place.progress,
-                    None => BookProgress::Location((0, 0)),
+            None => {
+                if size == 0 {
+                    return;
+                } else {
+                    self.selected_book.select(Some(0))
                 }
             }
         }
     }
 
-    /// Wipes the progress of a book
-    pub fn clear_all_progress(&mut self) {
-        match &mut self.source_data {
-            BookSource::Local(data) => data.progress.progress = BookProgress::NONE,
-            BookSource::Global(d) => {
-                d.clear_all_ch_progress();
+    /// Selects the previous book in the currently selected category. If no book is selected, the last book is selected
+    pub fn select_prev_book(&mut self, ctx: &Context) {
+        let size = self.get_current_category_size(ctx);
+        match self.selected_book.selected() {
+            Some(n) => {
+                if n == 0 {
+                    self.selected_book.select(Some(size - 1))
+                } else {
+                    self.selected_book.select(Some(n - 1))
+                }
             }
-        }
-    }
-
-    /// Displays info about a book
-    pub fn display_info(&self) -> String {
-        match self.source_data.clone() {
-            BookSource::Local(data) => {
-                let prog = data.get_progress_display();
-                format!(
-                    "{} | Lines: {}/{} ({:.2}%)",
-                    self.name, prog.0, prog.1, prog.2
-                )
-            }
-            BookSource::Global(data) => {
-                let percent_through =
-                    100.0 * data.get_chapters_ordered() as f64 / data.total_chapters as f64;
-                format!(
-                    "{} | Chapters read: {}/{} ({:.2}%)",
-                    self.name,
-                    data.get_chapters_ordered(),
-                    data.total_chapters,
-                    percent_through,
-                )
+            None => {
+                if size == 0 {
+                    return;
+                } else {
+                    self.selected_book.select(Some(size - 1))
+                }
             }
         }
     }

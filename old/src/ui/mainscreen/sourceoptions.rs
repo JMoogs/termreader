@@ -128,7 +128,6 @@ pub fn render_source_book(f: &mut Frame, app_state: &mut AppState) {
     f.render_widget(synopsis, chunks_horiz[0]);
 
     // Options
-
     let unselected_block = Block::default()
         .borders(Borders::ALL)
         .title("Options")

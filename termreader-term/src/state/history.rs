@@ -1,34 +1,85 @@
-use crate::BookInfo;
-use ratatui::widgets::ListState;
-use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+// This module contains data related to the history tab of the TUI.
 
-/// A struct to hold a user's reading history
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+use ratatui::widgets::ListState;
+use termreader_core::{history::HistoryEntry, Context};
+
+use crate::helpers::StatefulList;
+
 pub struct HistoryData {
-    /// The history entries
-    pub history: VecDeque<HistoryEntry>,
     /// The currently selected history entry
-    #[serde(skip)]
-    pub selected: ListState,
+    selected_entry: ListState,
+    pub local_book_options: StatefulList<String>,
+    pub global_book_options: StatefulList<String>,
 }
 
 impl HistoryData {
-    /// Clears all history
-    pub fn clear(&mut self) {
-        self.history = VecDeque::new();
-        self.selected.select(None);
+    /// Creates an instance of HistoryData
+    pub fn build(ctx: &Context) -> Self {
+        let selected_entry = if ctx.hist_get_len() == 0 {
+            ListState::default()
+        } else {
+            ListState::default().with_selected(Some(0))
+        };
+        Self {
+            selected_entry,
+            local_book_options: StatefulList::from(vec![
+                String::from("Continue reading"),
+                String::from("Remove from history"),
+            ]),
+            global_book_options: StatefulList::from(vec![
+                String::from("Continue reading"),
+                String::from("View book"),
+                String::from("Remove from history"),
+            ]),
+        }
     }
-}
 
-/// The data related to the history of a single novel
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HistoryEntry {
-    /// The book's info
-    pub book: BookInfo,
-    /// The timestamp at which the book was last read
-    // I'm unsure whether this is the last time they stopped reading, or the last time they started reading, need to check
-    pub timestamp: u64,
-    /// The chapter the user was last reading
-    pub chapter: usize,
+    /// Returns a mutable reference to the state representing the selected history entry. This will always succeed. This function should **not** be used directly
+    pub fn get_selected_entry_mut(&mut self) -> &mut ListState {
+        &mut self.selected_entry
+    }
+
+    /// Returns a reference to the entry that's selected
+    pub fn get_selected_book<'a>(&self, ctx: &'a Context) -> Option<&'a HistoryEntry> {
+        let hist = ctx.hist_get();
+        Some(&hist[self.selected_entry.selected()?])
+    }
+
+    pub fn select_next_entry(&mut self, ctx: &Context) {
+        if ctx.hist_get_len() == 0 {
+            self.selected_entry.select(None);
+            return;
+        }
+        match self.selected_entry.selected() {
+            Some(s) => {
+                self.selected_entry
+                    .select(Some((s + 1) % ctx.hist_get_len()));
+            }
+            None => {
+                if ctx.hist_get_len() != 0 {
+                    self.selected_entry.select(Some(0));
+                }
+            }
+        }
+    }
+
+    pub fn select_prev_entry(&mut self, ctx: &Context) {
+        match self.selected_entry.selected() {
+            Some(s) => {
+                if s == 0 {
+                    if ctx.hist_get_len() != 0 {
+                        self.selected_entry.select(Some(ctx.hist_get_len() - 1));
+                    }
+                } else {
+                    self.selected_entry.select(Some(s - 1));
+                }
+            }
+            None => {
+                let len = ctx.hist_get_len();
+                if len != 0 {
+                    self.selected_entry.select(Some(len - 1));
+                }
+            }
+        }
+    }
 }

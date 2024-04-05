@@ -1,37 +1,35 @@
-use crate::{
-    appstate::AppState,
-    helpers::StatefulList,
-    state::{
-        book_info::{BookInfo, BookSource},
-        channels::RequestData,
-        screen::{CurrentScreen, MiscOptions, SourceOptions},
-    },
-};
+#![allow(dead_code, unused_imports, unused_variables)]
+pub mod appstate;
+pub mod controls;
+pub mod helpers;
+pub mod logging;
+pub mod reader;
+pub mod state;
+pub mod ui;
+
+use crate::controls::handle_controls;
+use crate::logging::initialize_logging;
+use crate::state::channels::RequestData;
+use crate::state::AppState;
+use crate::state::Screen;
+use crate::ui::ui_main;
+use anyhow::Result;
 use crossterm::{
     event::{self, Event},
     execute, terminal,
 };
-use logging::initialize_logging;
+use helpers::StatefulList;
 use ratatui::prelude::*;
+use state::sources::SourceNovelPreviewSelection;
+use state::SourceScreen;
+use termreader_core::Context;
+use ui::reader::ui_reader;
 
-pub mod appstate;
-pub mod commands;
-pub mod helpers;
-pub mod local;
-pub mod logging;
-pub mod reader;
-pub mod shutdown;
-pub mod startup;
-pub mod state;
-pub mod ui;
+pub const UNSELECTED_STYLE: ratatui::style::Style = Style::new().fg(Color::White);
+pub const SELECTED_STYLE: ratatui::style::Style = Style::new().fg(Color::Green);
 
-use ui::{controls::handle_controls, mainscreen::main::ui_main, reader::ui_reader};
-
-const UNSELECTED_STYLE: ratatui::style::Style = Style::new().fg(Color::White);
-const SELECTED_STYLE: ratatui::style::Style = Style::new().fg(Color::Green);
-
-fn main() -> Result<(), anyhow::Error> {
-    // Set up logging
+fn main() -> Result<()> {
+    // Start logging
     initialize_logging()?;
     // Set up the terminal
     terminal::enable_raw_mode()?;
@@ -41,17 +39,15 @@ fn main() -> Result<(), anyhow::Error> {
         terminal::EnterAlternateScreen,
         event::EnableMouseCapture
     )?;
-
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app_state = AppState::build()?;
+    // Load data, run the app, and save data
+    let mut ctx = Context::build()?;
+    let mut app_state = AppState::build(&ctx);
+    let res = run_app(&mut terminal, &mut ctx, &mut app_state);
 
-    let res = run_app(&mut terminal, &mut app_state);
-
-    // Store data on shutdown
-    shutdown::store_books(&app_state.library_data.clone().into())?;
-    shutdown::store_history(&app_state.history_data)?;
+    ctx.save()?;
 
     // Restore the terminal to its initial state
     terminal::disable_raw_mode()?;
@@ -72,73 +68,58 @@ fn main() -> Result<(), anyhow::Error> {
 
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
+    ctx: &mut Context,
     app_state: &mut AppState,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     loop {
-        match app_state.current_screen {
-            CurrentScreen::Reader => terminal.draw(|f| ui_reader(f, app_state))?,
-            _ => terminal.draw(|f| ui_main(f, app_state))?,
+        if app_state.quit {
+            break;
+        }
+        match app_state.screen {
+            Screen::Reader => terminal.draw(|f| ui_reader(f, ctx, app_state))?,
+            _ => terminal.draw(|f| ui_main(f, ctx, app_state))?,
         };
 
-        if app_state.channels.loading {
-            if let Ok(data) = app_state.channels.reciever.recv() {
+        if app_state.channel.loading {
+            if let Ok(data) = app_state.channel.reciever.recv() {
                 match data {
                     RequestData::SearchResults(res) => {
-                        app_state.buffer.novel_previews = StatefulList::from(res?);
-                        app_state
-                            .update_screen(CurrentScreen::Sources(SourceOptions::SearchResults));
+                        // app_state.buffer.clear();
+                        app_state.buffer.novel_search_res = StatefulList::from(res?);
+                        app_state.update_screen(Screen::Sources(SourceScreen::SearchRes));
                     }
-                    RequestData::BookInfo(res) => {
+                    RequestData::BookInfo((res, opt)) => {
+                        // app_state.buffer.clear();
                         let res = res?;
-                        app_state.buffer.clear_novel();
+
+                        if opt {
+                            app_state.source_data.novel_preview_selected_field =
+                                SourceNovelPreviewSelection::Options;
+                        }
                         app_state.buffer.chapter_previews =
                             StatefulList::from(res.get_chapters().clone());
                         app_state.buffer.novel = Some(res);
 
-                        app_state.update_screen(CurrentScreen::Sources(SourceOptions::BookView));
+                        if opt {
+                            app_state.update_screen(Screen::Sources(SourceScreen::BookView));
+                        } else {
+                            todo!()
+                        }
                     }
-                    RequestData::BookInfoNoOpts(res) => {
-                        let res = res?;
-                        app_state.buffer.clear_novel();
-                        app_state.buffer.chapter_previews =
-                            StatefulList::from(res.get_chapters().clone());
-                        app_state.buffer.novel = Some(res);
-
-                        app_state.update_screen(CurrentScreen::Misc(MiscOptions::ChapterView));
-                    }
-                    RequestData::UpdateInfo((id, res)) => {
-                        let res = res?;
-                        let book = app_state.library_data.find_book_mut(id).unwrap();
-                        if let BookSource::Global(ref mut data) = book.source_data {
-                            data.total_chapters = res.get_length();
-                            data.novel = res;
+                    RequestData::Chapter((id, res, ch)) => {
+                        let book = ctx.lib_find_book_mut(id);
+                        let mut book = if let Some(b) = book {
+                            b.clone()
+                        } else {
+                            app_state.buffer.book.clone().unwrap()
                         };
-                    }
-                    RequestData::ChapterTemp((res, ch_no)) => {
-                        let novel = app_state.buffer.novel.clone().unwrap();
-                        app_state.move_to_reader(
-                            BookInfo::from_novel_temp(novel, ch_no)?,
-                            Some(ch_no),
-                            Some(res?),
-                        )?;
-                    }
-                    RequestData::Chapter((res, ch_no)) => {
-                        let mut book = app_state
-                            .library_data
-                            .get_category_list_mut()
-                            .selected()
-                            .unwrap()
-                            .clone();
-                        book.source_data.set_chapter(ch_no);
-                        app_state.move_to_reader(
-                            BookInfo::Library(book),
-                            Some(ch_no),
-                            Some(res?),
-                        )?;
+
+                        book.global_set_ch(ch);
+                        app_state.move_to_reader(book, Some(res?));
                     }
                 }
+                app_state.channel.loading = false;
                 // `event::read()` is blocking so continue to redraw after
-                app_state.channels.loading = false;
                 continue;
             }
         }
@@ -146,14 +127,10 @@ fn run_app<B: Backend>(
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Release {
                 // We only care about key presses
-                // Note: This should only matter with windows as other OSes don't have key release events in crossterm
                 continue;
             }
-            if handle_controls(app_state, key.code)? {
-                break;
-            }
+            handle_controls(ctx, app_state, key.code);
         }
     }
-
     Ok(())
 }

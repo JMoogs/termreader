@@ -19,8 +19,6 @@ ratatui = "0.24.0"
 serde = { version = "1.0.188", features = ["derive"]}
 serde_json = "1.0.107"
 sha256 = "1.4.0"
-directories = "5.0.1"
-lazy_static = "1.4.0"
 tracing = "0.1.40"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }

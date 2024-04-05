@@ -101,9 +101,9 @@ impl Sources {
             sources: get_sources(),
         }
     }
-    pub fn get_source_by_id(&self, id: &SourceID) -> Option<&Source> {
+    pub fn get_source_by_id(&self, id: SourceID) -> Option<&Source> {
         for source in &self.sources {
-            if source.get_id() == *id {
+            if source.get_id() == id {
                 return Some(&source);
             }
         }

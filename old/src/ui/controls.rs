@@ -8,8 +8,8 @@ use crate::{
         channels::RequestData,
         library::LibBookInfo,
         screen::{
-            CurrentScreen, HistoryOptions, LibraryOptions, MiscOptions, SettingsOptions,
-            SourceOptions, UpdateOptions,
+            HistoryOptions, LibraryOptions, MiscOptions, Screen, SettingsOptions, SourceOptions,
+            UpdateOptions,
         },
     },
 };
@@ -28,7 +28,7 @@ pub fn handle_controls(app_state: &mut AppState, mut event: event::KeyCode) -> R
         app_state.command_bar = true;
     }
     // On the rename screen, we just want to append to the string
-    if matches!(app_state.current_screen, CurrentScreen::Typing) {
+    if matches!(app_state.current_screen, Screen::Typing) {
         handle_typing(event, app_state)?;
         return Ok(false);
     }
@@ -48,12 +48,12 @@ pub fn handle_controls(app_state: &mut AppState, mut event: event::KeyCode) -> R
     }
     // Other times when we're not inputting:
     match app_state.current_screen {
-        CurrentScreen::Misc(option) => match option {
+        Screen::Misc(option) => match option {
             MiscOptions::ChapterView => {
                 control_chapter_view(app_state, event)?;
             }
         },
-        CurrentScreen::Library(option) => match option {
+        Screen::Library(option) => match option {
             LibraryOptions::Default => {
                 control_main_menu(app_state, event);
                 control_library_menu(app_state, event)?;
@@ -65,10 +65,10 @@ pub fn handle_controls(app_state: &mut AppState, mut event: event::KeyCode) -> R
             LibraryOptions::CategorySelect => control_library_category_select(app_state, event),
             LibraryOptions::CategoryOptions => control_library_category_options(app_state, event),
         },
-        CurrentScreen::Updates(option) => match option {
+        Screen::Updates(option) => match option {
             UpdateOptions::Default => control_main_menu(app_state, event),
         },
-        CurrentScreen::Sources(option) => match option {
+        Screen::Sources(option) => match option {
             SourceOptions::Default => {
                 control_main_menu(app_state, event);
                 control_sources_menu(app_state, event);
@@ -77,7 +77,7 @@ pub fn handle_controls(app_state: &mut AppState, mut event: event::KeyCode) -> R
             SourceOptions::SearchResults => control_source_search_result(app_state, event)?,
             SourceOptions::BookView => control_source_book_view(app_state, event)?,
         },
-        CurrentScreen::History(option) => match option {
+        Screen::History(option) => match option {
             HistoryOptions::Default => {
                 control_main_menu(app_state, event);
                 control_history_menu(app_state, event)?;
@@ -89,11 +89,11 @@ pub fn handle_controls(app_state: &mut AppState, mut event: event::KeyCode) -> R
                 control_history_global_book_select(app_state, event)?
             }
         },
-        CurrentScreen::Settings(option) => match option {
+        Screen::Settings(option) => match option {
             SettingsOptions::Default => control_main_menu(app_state, event),
         },
-        CurrentScreen::Reader => control_reader(app_state, event)?,
-        CurrentScreen::Typing => unreachable!(),
+        Screen::Reader => control_reader(app_state, event)?,
+        Screen::Typing => unreachable!(),
     }
 
     Ok(false)
@@ -108,7 +108,7 @@ fn control_back(app_state: &mut AppState) -> Result<bool> {
         return Ok(true);
     }
     let mut prev = app_state.prev_screens.pop().unwrap();
-    if prev == CurrentScreen::Typing {
+    if prev == Screen::Typing {
         if app_state.prev_screens.is_empty() {
             return Ok(true);
         } else {
@@ -158,8 +158,8 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
         }
         KeyCode::Enter => {
             match app_state.get_last_screen() {
-                CurrentScreen::Library(LibraryOptions::LocalBookSelect)
-                | CurrentScreen::Library(LibraryOptions::GlobalBookSelect) => {
+                Screen::Library(LibraryOptions::LocalBookSelect)
+                | Screen::Library(LibraryOptions::GlobalBookSelect) => {
                     let book = app_state
                         .library_data
                         .get_category_list()
@@ -171,14 +171,14 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
                         .rename_book(book.id, app_state.buffer.text.clone());
                     app_state.to_lib_screen();
                 }
-                CurrentScreen::Library(LibraryOptions::CategoryOptions) => {
+                Screen::Library(LibraryOptions::CategoryOptions) => {
                     app_state
                         .library_data
                         .create_category(app_state.buffer.text.clone());
                     app_state.update_category_list();
                     app_state.to_lib_screen();
                 }
-                CurrentScreen::Library(LibraryOptions::CategorySelect) => {
+                Screen::Library(LibraryOptions::CategorySelect) => {
                     app_state.library_data.rename_category(
                         app_state
                             .menu_options
@@ -190,10 +190,9 @@ fn handle_typing(event: KeyCode, app_state: &mut AppState) -> Result<(), anyhow:
                     );
                     app_state.update_category_list();
                     app_state.to_lib_screen();
-                    app_state
-                        .update_screen(CurrentScreen::Library(LibraryOptions::CategoryOptions));
+                    app_state.update_screen(Screen::Library(LibraryOptions::CategoryOptions));
                 }
-                CurrentScreen::Sources(SourceOptions::SourceSelect) => {
+                Screen::Sources(SourceOptions::SourceSelect) => {
                     app_state.channels.loading = true;
                     let source = app_state.get_selected_source().cloned().unwrap();
                     let text = app_state.buffer.text.clone();
@@ -218,22 +217,22 @@ fn control_main_menu(app_state: &mut AppState, event: event::KeyCode) {
         KeyCode::Char(']') | KeyCode::Tab => {
             app_state.current_main_tab.next();
             match app_state.current_main_tab.selected_idx() {
-                0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
-                1 => app_state.current_screen = CurrentScreen::Updates(UpdateOptions::Default),
-                2 => app_state.current_screen = CurrentScreen::Sources(SourceOptions::Default),
-                3 => app_state.current_screen = CurrentScreen::History(HistoryOptions::Default),
-                4 => app_state.current_screen = CurrentScreen::Settings(SettingsOptions::Default),
+                0 => app_state.current_screen = Screen::Library(LibraryOptions::Default),
+                1 => app_state.current_screen = Screen::Updates(UpdateOptions::Default),
+                2 => app_state.current_screen = Screen::Sources(SourceOptions::Default),
+                3 => app_state.current_screen = Screen::History(HistoryOptions::Default),
+                4 => app_state.current_screen = Screen::Settings(SettingsOptions::Default),
                 _ => unreachable!(),
             };
         }
         KeyCode::Char('[') | KeyCode::BackTab => {
             app_state.current_main_tab.previous();
             match app_state.current_main_tab.selected_idx() {
-                0 => app_state.current_screen = CurrentScreen::Library(LibraryOptions::Default),
-                1 => app_state.current_screen = CurrentScreen::Updates(UpdateOptions::Default),
-                2 => app_state.current_screen = CurrentScreen::Sources(SourceOptions::Default),
-                3 => app_state.current_screen = CurrentScreen::History(HistoryOptions::Default),
-                4 => app_state.current_screen = CurrentScreen::Settings(SettingsOptions::Default),
+                0 => app_state.current_screen = Screen::Library(LibraryOptions::Default),
+                1 => app_state.current_screen = Screen::Updates(UpdateOptions::Default),
+                2 => app_state.current_screen = Screen::Sources(SourceOptions::Default),
+                3 => app_state.current_screen = Screen::History(HistoryOptions::Default),
+                4 => app_state.current_screen = Screen::Settings(SettingsOptions::Default),
                 _ => unreachable!(),
             };
         }
@@ -364,13 +363,9 @@ fn control_history_menu(app_state: &mut AppState, event: event::KeyCode) -> Resu
                 .book
                 .is_local()
             {
-                app_state.update_screen(CurrentScreen::History(
-                    HistoryOptions::HistoryLocalBookOptions,
-                ))
+                app_state.update_screen(Screen::History(HistoryOptions::HistoryLocalBookOptions))
             } else {
-                app_state.update_screen(CurrentScreen::History(
-                    HistoryOptions::HistoryGlobalBookOptions,
-                ))
+                app_state.update_screen(Screen::History(HistoryOptions::HistoryGlobalBookOptions))
             }
         }
         _ => (),
@@ -404,11 +399,9 @@ fn control_library_menu(app_state: &mut AppState, event: event::KeyCode) -> Resu
             } else {
                 let book = b.unwrap();
                 if book.is_local() {
-                    app_state
-                        .update_screen(CurrentScreen::Library(LibraryOptions::LocalBookSelect));
+                    app_state.update_screen(Screen::Library(LibraryOptions::LocalBookSelect));
                 } else {
-                    app_state
-                        .update_screen(CurrentScreen::Library(LibraryOptions::GlobalBookSelect));
+                    app_state.update_screen(Screen::Library(LibraryOptions::GlobalBookSelect));
                 }
             }
         }
@@ -416,7 +409,7 @@ fn control_library_menu(app_state: &mut AppState, event: event::KeyCode) -> Resu
             // Opens a menu in which you can create / delete / reorder categories
             // Select the first option upon entering
             app_state.menu_options.category_options.select_first();
-            app_state.update_screen(CurrentScreen::Library(LibraryOptions::CategoryOptions))
+            app_state.update_screen(Screen::Library(LibraryOptions::CategoryOptions))
         }
         _ => (),
     }
@@ -446,11 +439,11 @@ fn control_library_local_book_select(
                 }
                 1 => {
                     // Move to category
-                    app_state.update_screen(CurrentScreen::Library(LibraryOptions::CategorySelect));
+                    app_state.update_screen(Screen::Library(LibraryOptions::CategorySelect));
                 }
                 2 => {
                     // Rename book
-                    app_state.update_screen(CurrentScreen::Typing);
+                    app_state.update_screen(Screen::Typing);
                 }
                 3 => {
                     // Start from beginning
@@ -536,15 +529,13 @@ fn control_library_global_book_select(
                         StatefulList::from(novel.get_chapters().clone());
                     app_state.buffer.novel = Some(novel);
 
-                    app_state.update_screen(CurrentScreen::Misc(MiscOptions::ChapterView));
+                    app_state.update_screen(Screen::Misc(MiscOptions::ChapterView));
                 }
                 // Move Category
-                2 => {
-                    app_state.update_screen(CurrentScreen::Library(LibraryOptions::CategorySelect))
-                }
+                2 => app_state.update_screen(Screen::Library(LibraryOptions::CategorySelect)),
                 // Rename
                 3 => {
-                    app_state.update_screen(CurrentScreen::Typing);
+                    app_state.update_screen(Screen::Typing);
                 }
                 // Restart
                 4 => {
@@ -590,9 +581,7 @@ fn control_library_category_select(app_state: &mut AppState, event: event::KeyCo
         KeyCode::Up => app_state.menu_options.category_list.previous(),
         KeyCode::Down => app_state.menu_options.category_list.next(),
         KeyCode::Enter => {
-            if app_state.get_last_screen()
-                == CurrentScreen::Library(LibraryOptions::CategoryOptions)
-            {
+            if app_state.get_last_screen() == Screen::Library(LibraryOptions::CategoryOptions) {
                 let opt = app_state
                     .menu_options
                     .category_options
@@ -601,7 +590,7 @@ fn control_library_category_select(app_state: &mut AppState, event: event::KeyCo
 
                 if opt == 2 {
                     // Rename
-                    app_state.update_screen(CurrentScreen::Typing)
+                    app_state.update_screen(Screen::Typing)
                 } else if opt == 3 {
                     // Delete
                     app_state.library_data.delete_category(
@@ -615,8 +604,7 @@ fn control_library_category_select(app_state: &mut AppState, event: event::KeyCo
                     app_state.menu_options.category_list.select_first();
                     app_state.update_category_list();
                     app_state.to_lib_screen();
-                    app_state
-                        .update_screen(CurrentScreen::Library(LibraryOptions::CategoryOptions));
+                    app_state.update_screen(Screen::Library(LibraryOptions::CategoryOptions));
                 } else {
                     unreachable!();
                 }
@@ -656,13 +644,11 @@ fn control_library_category_options(app_state: &mut AppState, event: event::KeyC
                 .unwrap();
             match choice {
                 // Create a category
-                0 => app_state.update_screen(CurrentScreen::Typing),
+                0 => app_state.update_screen(Screen::Typing),
                 // Reorder categories
                 1 => (),
                 // Rename & delete
-                2 | 3 => {
-                    app_state.update_screen(CurrentScreen::Library(LibraryOptions::CategorySelect))
-                }
+                2 | 3 => app_state.update_screen(Screen::Library(LibraryOptions::CategorySelect)),
                 _ => unreachable!(),
             }
         }
@@ -740,7 +726,7 @@ fn control_sources_menu(app_state: &mut AppState, event: event::KeyCode) {
         KeyCode::Enter => {
             let source = app_state.source_data.selected();
             if source.is_some() {
-                app_state.update_screen(CurrentScreen::Sources(SourceOptions::SourceSelect));
+                app_state.update_screen(Screen::Sources(SourceOptions::SourceSelect));
             }
         }
         _ => (),
@@ -761,7 +747,7 @@ fn control_source_select(app_state: &mut AppState, event: event::KeyCode) -> Res
             // 1 = view popular
             match option {
                 0 => {
-                    app_state.update_screen(CurrentScreen::Typing);
+                    app_state.update_screen(Screen::Typing);
                 }
                 1 => {
                     app_state.channels.loading = true;
@@ -993,7 +979,7 @@ fn control_history_global_book_select(
                         let novel = source.parse_novel_and_chapters(
                             book.get_novel().unwrap().get_url().to_string(),
                         );
-                        let _ = tx.send(RequestData::BookInfoNoOpts(novel));
+                        let _ = tx.send(RequestData::BookInfo((novel, false)));
                     });
                 }
                 2 => {

@@ -1,219 +1,307 @@
-use crate::reader::ReaderData;
-use crate::state::{
-    book_info::{BookInfo, BookSource},
-    buffer::AppBuffer,
-    channels::ChannelData,
-    history::{HistoryData, HistoryEntry},
-    library::LibraryData,
-    menu::MenuOptions,
-    screen::{CurrentScreen, HistoryOptions, LibraryOptions, SourceOptions},
-};
-use crate::{
-    helpers::{CategoryTabs, StatefulList},
-    startup,
-};
-use anyhow::Result;
-use std::time::SystemTime;
-use termreader_sources::{
-    chapter::Chapter,
-    sources::{Source, SourceID, Sources},
-};
+// pub struct LibStates {
+//     current_category_idx: usize,
+//     selected_book: ListState,
+// }
 
-pub struct AppState {
-    /// Stores the current screen that is being rendered.
-    pub current_screen: CurrentScreen,
-    /// Stores a list of all the previously accessed screens - the implementation of the back button.
-    pub prev_screens: Vec<CurrentScreen>,
-    /// Manages the state of the main tabs
-    pub current_main_tab: CategoryTabs,
-    /// Stores all data related to the book library
-    pub library_data: LibraryData,
-    /// Stores all data related to the reader itself, only intialized if the user has entered a book at least once in their session
-    pub reader_data: Option<ReaderData>,
-    /// Stores reading history
-    pub history_data: HistoryData,
-    /// Contains all the options for all possible lists, and their states
-    pub menu_options: MenuOptions,
-    /// The internal sources
-    sources: Sources,
-    /// Contains data about the currently accessed source
-    pub source_data: StatefulList<(SourceID, String)>,
-    /// Buffers to store any temporary data
-    pub buffer: AppBuffer,
-    /// Contains senders/recievers for the channel, used for any synchronous operations
-    pub channels: ChannelData,
-    /// Represents whether the user is in the command bar or not
-    pub command_bar: bool,
-}
+// impl LibStates {
+//     fn build() -> Self {
+//         Self {
+//             current_category_idx: 0,
+//             selected_book: ListState::default(),
+//         }
+//     }
 
-impl AppState {
-    pub fn get_last_screen(&self) -> CurrentScreen {
-        return *self.prev_screens.last().unwrap();
-    }
+//     /// Get the current selected category. This function ensures that the index is always within bounds
+//     pub fn get_selected_category(&mut self, ctx: &Context) -> usize {
+//         let max_idx = ctx.lib_get_categories().len() - 1;
+//         if self.current_category_idx > max_idx {
+//             self.current_category_idx = max_idx;
+//         }
+//         self.current_category_idx = max_idx;
 
-    pub fn update_screen(&mut self, new: CurrentScreen) {
-        if self.current_screen.in_reader() && new == CurrentScreen::Reader {
-            return;
-        }
-        if self.current_screen.on_main_menu() {
-            self.prev_screens = Vec::new();
-        }
-        if new.on_main_menu() {
-            self.prev_screens = Vec::new();
-        } else {
-            self.prev_screens.push(self.current_screen);
-        }
-        self.current_screen = new;
-    }
+//         self.current_category_idx
+//     }
 
-    pub fn to_history_screen(&mut self) {
-        self.prev_screens = Vec::new();
-        self.current_screen = CurrentScreen::History(HistoryOptions::Default);
-    }
+//     /// Selects the next category, wrapping around as required
+//     pub fn select_next_category(&mut self, ctx: &Context) {
+//         let list_len = ctx.lib_get_categories().len();
 
-    pub fn to_lib_screen(&mut self) {
-        self.prev_screens = Vec::new();
-        self.current_screen = CurrentScreen::Library(LibraryOptions::Default);
-    }
+//         self.current_category_idx = (self.current_category_idx + 1) % list_len;
+//     }
 
-    pub fn to_source_screen(&mut self) {
-        self.prev_screens = Vec::new();
-        self.current_screen = CurrentScreen::Sources(SourceOptions::Default);
-    }
+//     /// Selects the previous category, wrapping around as required
+//     pub fn select_previous_category(&mut self, ctx: &Context) {
+//         let max_idx = ctx.lib_get_categories().len() - 1;
 
-    pub fn update_category_list(&mut self) {
-        self.menu_options.category_list =
-            StatefulList::from(self.library_data.categories.items.clone());
-    }
+//         if self.current_category_idx == 0 {
+//             self.current_category_idx = max_idx;
+//         } else {
+//             self.current_category_idx -= 1;
+//         }
+//     }
 
-    pub fn build() -> Result<Self, anyhow::Error> {
-        let lib_info = startup::load_books()?;
-        let library_data = LibraryData::from(lib_info);
+//     //
+//     pub fn get_selected_book_mut(&mut self, books_len: usize) -> &mut ListState {
+//         match self.selected_book.selected() {
+//             Some(s) => {
+//                 if books_len == 0 {
+//                     self.selected_book.select(None)
+//                 } else if s >= books_len {
+//                     self.selected_book.select(Some(0))
+//                 };
 
-        let mut history_data = startup::load_history()?;
-        if !history_data.history.is_empty() {
-            history_data.selected.select(Some(0));
-        }
+//                 &mut self.selected_book
+//             }
+//             None => {
+//                 if books_len > 0 {
+//                     self.selected_book.select(Some(0));
+//                 }
+//                 &mut self.selected_book
+//             }
+//         }
+//     }
 
-        let cats = library_data.categories.items.clone();
+//     pub fn select_next_book(&mut self, ctx: &Context) {
+//         let size = self.get_current_category_size(ctx);
+//         match self.selected_book.selected() {
+//             Some(s) => {
+//                 if size == 0 {
+//                     self.selected_book.select(None)
+//                 } else {
+//                     self.selected_book.select(Some((s + 1) % size))
+//                 }
+//             }
+//             None => {
+//                 if size > 0 {
+//                     self.selected_book.select(Some(0))
+//                 }
+//             }
+//         }
+//     }
 
-        let sources = Sources::build();
+//     pub fn select_prev_book(&mut self, ctx: &Context) {
+//         let size = self.get_current_category_size(ctx);
+//         match self.selected_book.selected() {
+//             Some(s) => {
+//                 if size == 0 {
+//                     self.selected_book.select(None)
+//                 } else if s == 0 {
+//                     self.selected_book.select(Some(size - 1));
+//                 } else {
+//                     self.selected_book.select(Some(s - 1));
+//                 }
+//             }
+//             None => {
+//                 if size > 0 {
+//                     self.selected_book.select(Some(size - 1));
+//                 }
+//             }
+//         }
+//     }
 
-        Ok(Self {
-            current_screen: CurrentScreen::Library(LibraryOptions::Default),
-            prev_screens: Vec::new(),
-            current_main_tab: CategoryTabs::build(),
-            library_data,
-            history_data,
-            reader_data: None,
-            menu_options: MenuOptions::new(cats),
-            sources: sources.clone(),
-            source_data: StatefulList::from(sources.get_source_info()),
-            buffer: AppBuffer::default(),
-            channels: ChannelData::new(),
-            command_bar: false,
-        })
-    }
+//     pub fn reset_selected_book(&mut self) {
+//         self.selected_book.select(None);
+//     }
 
-    pub fn move_to_reader(
-        &mut self,
-        mut book: BookInfo,
-        chapter: Option<usize>,
-        text: Option<Chapter>,
-    ) -> Result<(), anyhow::Error> {
-        self.update_screen(CurrentScreen::Reader);
-        match book.get_source_data_mut() {
-            BookSource::Local(_) => {
-                self.reader_data = Some(ReaderData::create(book, chapter, None)?)
-            }
-            BookSource::Global(_) => {
-                self.reader_data = Some(ReaderData::create(book, chapter, text)?)
-            }
-        }
+//     pub fn get_current_category_size(&mut self, ctx: &Context) -> usize {
+//         let cat_name = &ctx.lib_get_categories()[self.get_selected_category(ctx)];
+//         ctx.lib_get_books().get(cat_name).unwrap().len()
+//     }
+// }
 
-        Ok(())
-    }
+// pub struct SourceStates {
+//     selected_source: ListState,
+// }
 
-    pub fn update_from_reader(&mut self) -> Result<()> {
-        let reader_data = if self.reader_data.is_none() {
-            return Ok(());
-        } else {
-            self.reader_data.as_mut().unwrap()
-        };
+// impl SourceStates {
+//     fn build() -> Self {
+//         Self {
+//             selected_source: ListState::default().with_selected(Some(0)),
+//         }
+//     }
 
-        reader_data.set_progress()?;
+//     pub fn get_selected_source_mut(&mut self) -> &mut ListState {
+//         // There will always be at least one source so it should be safe to simply give out the reference
+//         &mut self.selected_source
+//     }
 
-        // For updating the library, we only care if the book is in the library.
-        if let BookInfo::Library(d) = &reader_data.book_info {
-            let copy = d.clone();
-            let id = copy.id;
-            let b = self.library_data.find_book_mut(id);
-            match b {
-                None => panic!("This should be unreachable"),
-                Some(book) => {
-                    let _ = std::mem::replace(book, copy);
-                }
-            }
-        }
+//     pub fn select_next(&mut self, ctx: &Context) {
+//         let size = ctx.source_get_info().len();
+//         let sel = self.selected_source.selected().unwrap();
+//         self.selected_source.select(Some((sel + 1) % size))
+//     }
 
-        // Adding to the history:
-        let info = reader_data.book_info.clone();
-        let ch = info.get_source_data().get_chapter();
-        let timestamp = {
-            let now = SystemTime::now();
-            now.duration_since(SystemTime::UNIX_EPOCH)
-                .expect("Time has once again gone VERY backwards.")
-        }
-        .as_secs();
+//     pub fn select_prev(&mut self, ctx: &Context) {
+//         let size = ctx.source_get_info().len();
+//         let sel = self.selected_source.selected().unwrap();
+//         if sel == 0 {
+//             self.selected_source.select(Some(size - 1));
+//         } else {
+//             self.selected_source.select(Some(sel - 1));
+//         }
+//     }
 
-        // Remove any previous instances
-        let mut index = None;
-        for (i, item) in self.history_data.history.iter().enumerate() {
-            if item.book == info {
-                index = Some(i)
-            }
-        }
-        if let Some(idx) = index {
-            self.history_data.history.remove(idx);
-        }
+//     pub fn get_selected_source_id(&self, ctx: &Context) -> SourceID {
+//         let idx = self.selected_source.selected().unwrap();
+//         ctx.source_get_info()[idx].0
+//     }
+// }
 
-        self.history_data.history.push_front(HistoryEntry {
-            book: info,
-            timestamp,
-            chapter: ch,
-        });
+// pub struct HistoryStates {
+//     selected_entry: ListState,
+// }
 
-        Ok(())
-    }
+// impl HistoryStates {
+//     fn build() -> Self {
+//         Self {
+//             selected_entry: ListState::default().with_selected(Some(0)),
+//         }
+//     }
 
-    pub fn reset_selections(&mut self) {
-        self.menu_options.global_options.select_first();
-        self.menu_options.local_options.select_first();
-        self.menu_options.source_options.select_first();
-        self.menu_options.local_history_options.select_first();
-        self.menu_options.global_history_options.select_first();
-        self.menu_options.category_list.select_first();
-        self.menu_options.source_book_options.select_first();
-        self.menu_options.category_options.select_first();
-    }
+//     pub fn get_selected_entry_mut(&mut self, entries_len: usize) -> &mut ListState {
+//         if entries_len == 0 {
+//             self.selected_entry.select(None);
+//         }
+//         // If nothing is selected and there's something to select, select it.
+//         // If something is selected, but there is nothing to select, unselect.
+//         // If something is selected, but it is out of bounds, and there is something to select, select the first thing.
+//         match self.selected_entry.selected() {
+//             Some(s) => {
+//                 if entries_len == 0 {
+//                     self.selected_entry.select(None)
+//                 } else if s >= entries_len {
+//                     self.selected_entry.select(Some(0))
+//                 }
+//             }
+//             None => {
+//                 if entries_len > 0 {
+//                     self.selected_entry.select(Some(0))
+//                 }
+//             }
+//         }
+//         &mut self.selected_entry
+//     }
+// }
 
-    pub fn get_source_by_id(&self, id: &SourceID) -> Option<&Source> {
-        self.sources.get_source_by_id(id)
-    }
+// #[derive(PartialEq, Eq, Clone, Copy)]
+// pub enum NovelPreviewSelection {
+//     Summary,
+//     Chapters,
+//     Options,
+// }
 
-    pub fn get_selected_source(&self) -> Option<&Source> {
-        let selected_id = self.source_data.selected();
-        match selected_id {
-            Some((id, _)) => self.get_source_by_id(id),
-            None => None,
-        }
-    }
-}
+// pub struct Buffer {
+//     pub text: String,
+//     pub selection_options: Vec<String>,
+//     pub selection_title: String,
+//     pub temp_state: ListState,
+//     pub novel_previews: StatefulList<NovelPreview>,
+//     pub novel: Option<Novel>,
+//     pub novel_preview_selection: NovelPreviewSelection,
+//     pub novel_preview_scroll: usize,
+//     pub chapter_previews: StatefulList<ChapterPreview>,
+// }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq)]
-pub enum SourceBookBox {
-    #[default]
-    Options,
-    Chapters,
-    Summary,
-}
+// impl Buffer {
+//     fn build() -> Self {
+//         Self {
+//             text: String::default(),
+//             selection_options: Vec::new(),
+//             selection_title: String::new(),
+//             temp_state: ListState::default(),
+//             novel_previews: StatefulList::new(),
+//             novel: None,
+//             novel_preview_selection: NovelPreviewSelection::Chapters,
+//             novel_preview_scroll: 0,
+//             chapter_previews: StatefulList::new(),
+//         }
+//     }
+
+//     pub fn clear(&mut self) {
+//         let _ = std::mem::replace(self, Buffer::build());
+//     }
+
+//     pub fn set_selection(&mut self, title: String, options: Vec<String>) {
+//         self.selection_title = title;
+//         self.selection_options = options;
+//         if self.selection_options.len() > 0 {
+//             self.temp_state = ListState::default().with_selected(Some(0))
+//         } else {
+//             self.temp_state = ListState::default()
+//         }
+//     }
+
+//     pub fn select_next(&mut self) {
+//         let size = self.selection_options.len();
+//         match self.temp_state.selected() {
+//             Some(s) => {
+//                 if size == 0 {
+//                     self.temp_state.select(None)
+//                 } else {
+//                     self.temp_state.select(Some((s + 1) % size))
+//                 }
+//             }
+//             None => {
+//                 if size > 0 {
+//                     self.temp_state.select(Some(0))
+//                 }
+//             }
+//         };
+//     }
+
+//     pub fn select_prev(&mut self) {
+//         let size = self.selection_options.len();
+//         match self.temp_state.selected() {
+//             Some(s) => {
+//                 if size == 0 {
+//                     self.temp_state.select(None)
+//                 } else if s == 0 {
+//                     self.temp_state.select(Some(size - 1))
+//                 } else {
+//                     self.temp_state.select(Some(s - 1))
+//                 }
+//             }
+//             None => {
+//                 if size > 0 {
+//                     self.temp_state.select(Some(size - 1))
+//                 }
+//             }
+//         }
+//     }
+// }
+
+// /// Contains all the possible requests that can be made through channels.
+// /// These are requests that need to happen synchronously
+// pub enum RequestData {
+//     /// The results of a search
+//     SearchResults(Result<Vec<NovelPreview>>),
+//     /// Info about a novel. The bool signifies whether or not to show an options menu.
+//     BookInfo((Result<Novel>, bool)),
+//     // /// A chapter
+//     // Chapter((ID, Result<Chapter>, usize)),
+//     // /// Update info for a book
+//     // Updated(Book),
+// }
+
+// pub struct ChannelData {
+//     sender: Sender<RequestData>,
+//     pub reciever: Receiver<RequestData>,
+//     pub loading: bool,
+// }
+
+// impl ChannelData {
+//     /// Creates a new channel
+//     pub fn build() -> Self {
+//         let (sender, reciever) = std::sync::mpsc::channel();
+//         Self {
+//             sender,
+//             reciever,
+//             loading: false,
+//         }
+//     }
+
+//     /// Get a sender for the channel
+//     pub fn get_sender(&self) -> Sender<RequestData> {
+//         return self.sender.clone();
+//     }
+// }

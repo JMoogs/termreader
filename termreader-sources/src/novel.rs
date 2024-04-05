@@ -48,8 +48,8 @@ pub struct Novel {
 }
 
 impl Novel {
-    pub fn get_source(&self) -> &SourceID {
-        &self.source
+    pub fn get_source(&self) -> SourceID {
+        self.source
     }
 
     pub fn get_name(&self) -> &str {

@@ -1,20 +1,15 @@
 use crate::{
     appstate::AppState,
     helpers::to_datetime,
-    state::screen::{CurrentScreen, HistoryOptions, LibraryOptions, MiscOptions, SourceOptions},
-    ui::mainscreen::bookoptions::{
-        render_category_box, render_category_options, render_local_selection, render_type_box,
-    },
+    state::screen::{HistoryOptions, LibraryScreen, MiscOptions, Screen, SourceOptions},
+    ui::mainscreen::bookoptions::render_type_box,
     ui::{mainscreen::sourceoptions::render_source_selection, render_loading_popup},
     SELECTED_STYLE, UNSELECTED_STYLE,
 };
 use ratatui::{prelude::*, widgets::*};
 
 use super::{
-    bookoptions::{
-        render_ch_list, render_global_selection, render_global_selection_history,
-        render_local_selection_history,
-    },
+    bookoptions::{render_ch_list, render_selection_box},
     sourceoptions::{render_search_results, render_source_book},
 };
 
@@ -25,14 +20,14 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
 
     if matches!(
         app_state.current_screen,
-        CurrentScreen::Sources(SourceOptions::BookView)
+        Screen::Sources(SourceOptions::BookView)
     ) {
         render_source_book(f, app_state);
         return;
     }
     if matches!(
         app_state.current_screen,
-        CurrentScreen::Misc(MiscOptions::ChapterView)
+        Screen::Misc(MiscOptions::ChapterView)
     ) {
         render_ch_list(app_state, f);
         return;
@@ -49,12 +44,12 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
 
     render_tabs(chunks[0], app_state, f);
 
-    match app_state.current_main_tab.selected_idx() {
-        0 => render_lib(chunks[1], app_state, f),
-        1 => render_updates(chunks[1], f),
-        2 => render_sources(chunks[1], app_state, f),
-        3 => render_history(chunks[1], app_state, f),
-        4 => render_settings(chunks[1], f),
+    match app_state.tab.selected().unwrap().as_str() {
+        "Library" => render_lib(chunks[1], app_state, f),
+        "Updates" => render_updates(chunks[1], f),
+        "Sources" => render_sources(chunks[1], app_state, f),
+        "History" => render_history(chunks[1], app_state, f),
+        "Settings" => render_settings(chunks[1], f),
         _ => unreachable!(),
     };
 
@@ -79,9 +74,8 @@ pub fn ui_main(f: &mut Frame, app_state: &mut AppState) {
 
 fn render_tabs(rect: Rect, app_state: &AppState, f: &mut Frame) {
     let titles: Vec<Line> = app_state
-        .current_main_tab
-        .tabs()
-        .clone()
+        .tab
+        .to_vec()
         .into_iter()
         .map(|t| Line::from(t).alignment(Alignment::Center))
         .collect();
@@ -92,7 +86,7 @@ fn render_tabs(rect: Rect, app_state: &AppState, f: &mut Frame) {
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded),
         )
-        .select(app_state.current_main_tab.selected_idx())
+        .select(app_state.tab.selected_idx().unwrap())
         .style(UNSELECTED_STYLE)
         .highlight_style(SELECTED_STYLE);
 
@@ -114,10 +108,9 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     //
     //
     let categories: Vec<Line> = app_state
-        .library_data
-        .categories
-        .items
-        .clone()
+        .context
+        .library
+        .get_categories()
         .into_iter()
         .map(|t| Line::from(t).alignment(Alignment::Center))
         .collect();
@@ -129,7 +122,7 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
                 .title("Categories")
                 .border_type(BorderType::Rounded),
         )
-        .select(app_state.library_data.categories.selected_idx().unwrap())
+        .select(app_state.states.get_selected_category(&app_state.context))
         .style(UNSELECTED_STYLE)
         .highlight_style(SELECTED_STYLE);
 
@@ -139,14 +132,10 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     //
     //
     let display_data: Vec<ListItem> = app_state
-        .library_data
-        .get_category_list()
-        .items
+        .states
+        .get_category_books(&app_state.context)
         .iter()
-        .map(|f| {
-            let s = f.display_info();
-            ListItem::new(s).style(UNSELECTED_STYLE)
-        })
+        .map(|s| ListItem::new(s.to_string()).style(UNSELECTED_STYLE))
         .collect();
 
     let books = List::new(display_data)
@@ -162,25 +151,18 @@ fn render_lib(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     f.render_stateful_widget(
         books,
         chunks[1],
-        app_state.library_data.get_category_list_mut().state_mut(),
+        app_state.states.get_category_list_state(&app_state.context),
     );
 
     // Render a centered box on top if in certain menus.
     match app_state.current_screen {
-        CurrentScreen::Library(LibraryOptions::LocalBookSelect) => {
-            render_local_selection(rect, app_state, f);
+        Screen::Library(LibraryScreen::BookSelect)
+        | Screen::Library(LibraryScreen::CategorySelect)
+        | Screen::Library(LibraryScreen::CategoryOptions) => {
+            render_selection_box(rect, app_state, f);
         }
-        CurrentScreen::Library(LibraryOptions::GlobalBookSelect) => {
-            render_global_selection(rect, app_state, f);
-        }
-        CurrentScreen::Typing => {
-            render_type_box(rect, app_state, f);
-        }
-        CurrentScreen::Library(LibraryOptions::CategorySelect) => {
-            render_category_box(chunks[1], app_state, f)
-        }
-        CurrentScreen::Library(LibraryOptions::CategoryOptions) => {
-            render_category_options(rect, app_state, f)
+        Screen::Typing => {
+            render_type_box(rect, app_state, f, "Input Text:".into());
         }
         _ => (),
     }
@@ -194,10 +176,10 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         .constraints([Constraint::Min(1)])
         .split(rect);
 
-    let items = app_state.source_data.clone().to_vec();
+    let items = app_state.context.sources.get_source_names();
     let display_data: Vec<ListItem> = items
         .into_iter()
-        .map(|(_, f)| ListItem::new(f).style(UNSELECTED_STYLE))
+        .map(|f| ListItem::new(f).style(UNSELECTED_STYLE))
         .collect();
 
     let sources = List::new(display_data)
@@ -210,20 +192,16 @@ fn render_sources(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         .highlight_style(SELECTED_STYLE)
         .highlight_symbol("> ");
 
-    if let CurrentScreen::Sources(SourceOptions::SearchResults) = app_state.current_screen {
+    if let Screen::Sources(SourceOptions::SearchResults) = app_state.current_screen {
         render_search_results(chunks[0], app_state, f, "Results");
     } else {
-        f.render_stateful_widget(sources, chunks[0], app_state.source_data.state_mut());
+        f.render_stateful_widget(sources, chunks[0], &mut app_state.states.selection_box);
     }
 
-    if let CurrentScreen::Sources(SourceOptions::SourceSelect) = app_state.current_screen {
+    if let Screen::Sources(SourceOptions::SourceSelect) = app_state.current_screen {
         render_source_selection(rect, app_state, f);
-    } else if let CurrentScreen::Typing = app_state.current_screen {
-        render_type_box(rect, app_state, f)
-    }
-
-    if let CurrentScreen::Sources(SourceOptions::SearchResults) = app_state.current_screen {
-        render_search_results(chunks[0], app_state, f, "Results");
+    } else if let Screen::Typing = app_state.current_screen {
+        render_type_box(rect, app_state, f, "Search sources:".into())
     }
 }
 
@@ -234,23 +212,20 @@ fn render_history(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         .split(rect);
 
     let display_data: Vec<ListItem> = app_state
-        .history_data
+        .context
         .history
+        .get_history()
         .clone()
         .into_iter()
-        .map(|s| {
-            if s.chapter == 0 {
-                format!(
-                    "{} | {}",
-                    s.book.get_source_data().get_name(),
-                    to_datetime(s.timestamp)
-                )
+        .map(|e| {
+            if e.get_chapter() == 0 {
+                format!("{} | {}", e.get_book_name(), to_datetime(e.get_timestamp()))
             } else {
                 format!(
                     "{} | Chapter {} | {}",
-                    s.book.get_source_data().get_name(),
-                    s.chapter,
-                    to_datetime(s.timestamp)
+                    e.get_book_name(),
+                    e.get_chapter(),
+                    to_datetime(e.get_timestamp())
                 )
             }
         })
@@ -267,17 +242,14 @@ fn render_history(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         .highlight_style(SELECTED_STYLE)
         .highlight_symbol("> ");
 
-    f.render_stateful_widget(history, chunks[0], &mut app_state.history_data.selected);
+    f.render_stateful_widget(history, chunks[0], &mut app_state.states.history_selection);
 
     // Menu boxes
-    if let CurrentScreen::History(HistoryOptions::HistoryLocalBookOptions) =
-        app_state.current_screen
-    {
-        render_local_selection_history(rect, app_state, f);
-    } else if let CurrentScreen::History(HistoryOptions::HistoryGlobalBookOptions) =
-        app_state.current_screen
-    {
-        render_global_selection_history(rect, app_state, f);
+    if matches!(
+        app_state.current_screen,
+        Screen::History(HistoryOptions::HistoryBookOptions)
+    ) {
+        render_selection_box(rect, app_state, f);
     }
 }
 

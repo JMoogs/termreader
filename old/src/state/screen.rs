@@ -1,8 +1,8 @@
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum CurrentScreen {
+pub enum Screen {
     // Main(MenuType),
     Misc(MiscOptions),
-    Library(LibraryOptions),
+    Library(LibraryScreen),
     Updates(UpdateOptions),
     Sources(SourceOptions),
     History(HistoryOptions),
@@ -11,24 +11,24 @@ pub enum CurrentScreen {
     Typing,
 }
 
-impl CurrentScreen {
+impl Screen {
     pub fn in_reader(&self) -> bool {
-        matches!(self, CurrentScreen::Reader)
+        matches!(self, Screen::Reader)
     }
     pub fn on_main_menu(&self) -> bool {
         match self {
-            CurrentScreen::Library(LibraryOptions::Default)
-            | CurrentScreen::Sources(SourceOptions::Default)
-            | CurrentScreen::Updates(UpdateOptions::Default)
-            | CurrentScreen::History(HistoryOptions::Default)
-            | CurrentScreen::Settings(SettingsOptions::Default) => true,
+            Screen::Library(LibraryScreen::Default)
+            | Screen::Sources(SourceOptions::Default)
+            | Screen::Updates(UpdateOptions::Default)
+            | Screen::History(HistoryOptions::Default)
+            | Screen::Settings(SettingsOptions::Default) => true,
 
             _ => false,
         }
     }
 
     pub fn on_library_menu(&self) -> bool {
-        matches!(self, CurrentScreen::Library(LibraryOptions::Default))
+        matches!(self, Screen::Library(LibraryScreen::Default))
     }
 }
 
@@ -38,10 +38,9 @@ pub enum MiscOptions {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum LibraryOptions {
+pub enum LibraryScreen {
     Default,
-    LocalBookSelect,
-    GlobalBookSelect,
+    BookSelect,
     CategorySelect,
     CategoryOptions,
 }
@@ -62,8 +61,7 @@ pub enum SourceOptions {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum HistoryOptions {
     Default,
-    HistoryLocalBookOptions,
-    HistoryGlobalBookOptions,
+    HistoryBookOptions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]

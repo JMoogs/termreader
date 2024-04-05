@@ -1,5 +1,5 @@
 [package]
-name = "termreader-term"
+name = "termreader-core"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -12,17 +12,12 @@ license.workspace = true
 
 [dependencies]
 termreader-sources = { path = "../termreader-sources" }
-termreader-core = { path = "../termreader-core" }
-anyhow = "1.0.75"
-crossterm = "0.27.0"
-ratatui = "0.24.0"
 serde = { version = "1.0.188", features = ["derive"]}
 serde_json = "1.0.107"
-sha256 = "1.4.0"
+anyhow = "1.0.75"
 directories = "5.0.1"
 lazy_static = "1.4.0"
 tracing = "0.1.40"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
-chrono = "0.4.31"
-regex = "1.10.2"
+sha256 = "1.4.0"

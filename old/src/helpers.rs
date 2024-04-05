@@ -1,5 +1,6 @@
 use chrono::{TimeZone, Utc};
 use ratatui::widgets::ListState;
+use serde::{Deserialize, Serialize};
 
 /// A structure containing both the vector of items, `items`, as well as the state, `state`
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -11,14 +12,13 @@ pub struct StatefulList<T> {
 }
 
 impl<T> From<StatefulList<T>> for Vec<T> {
-    /// Converts the list back into a vector, removing any state
     fn from(value: StatefulList<T>) -> Self {
         value.items
     }
 }
 
 impl<T> From<Vec<T>> for StatefulList<T> {
-    /// Selects the first element from the list if the list has any elements
+    /// Selects the first element from the list if the list has any elements.
     fn from(value: Vec<T>) -> Self {
         if value.len() > 0 {
             StatefulList {
@@ -51,7 +51,7 @@ impl<T> StatefulList<T> {
     }
 
     /// Selects the first element of the list.
-    /// This function does not check whether the list has any elements
+    /// This function does not check whether the list has any elements.
     #[inline]
     pub fn select_first(&mut self) {
         self.state.select(Some(0));
@@ -126,6 +126,11 @@ impl<T> StatefulList<T> {
             };
             self.state.select(Some(i));
         }
+    }
+
+    /// Converts the list back to a vector, losing state.
+    pub fn to_vec(self) -> Vec<T> {
+        self.items
     }
 }
 
