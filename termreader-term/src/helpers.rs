@@ -50,13 +50,6 @@ impl<T> StatefulList<T> {
         &mut self.state
     }
 
-    /// Selects the first element of the list.
-    /// This function does not check whether the list has any elements
-    #[inline]
-    pub fn select_first(&mut self) {
-        self.state.select(Some(0));
-    }
-
     /// Unselects any selected list element.
     #[inline]
     pub fn unselect(&mut self) {
@@ -125,6 +118,16 @@ impl<T> StatefulList<T> {
                 None => 0,
             };
             self.state.select(Some(i));
+        }
+    }
+
+    /// Selects the first element, selecting none if the list is empty
+    #[inline]
+    pub fn select_first(&mut self) {
+        if self.items.is_empty() {
+            self.state.select(None);
+        } else {
+            self.state.select(Some(0));
         }
     }
 }

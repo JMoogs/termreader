@@ -37,9 +37,9 @@ impl LibData {
             global_selected_book_opts: StatefulList::from(vec![
                 String::from("Continue reading"),
                 String::from("View chapter list"),
-                String::from("Move to category..."),
+                String::from("Move to category"),
                 String::from("Rename"),
-                String::from("Start from beginning"),
+                String::from("Reset Progress"),
                 String::from("Remove book from library"),
             ]),
         }
@@ -77,6 +77,11 @@ impl LibData {
         if self.get_current_category_size(ctx) > 0 && self.selected_book.selected().is_none() {
             self.selected_book.select(Some(0))
         }
+    }
+
+    pub fn reset_selection(&mut self, ctx: &Context) {
+        self.selected_book.select(None);
+        self.fix_book_selection_state(ctx);
     }
 
     /// Returns the size of the currently selected category

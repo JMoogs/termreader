@@ -6,6 +6,7 @@ pub mod sources;
 
 use crate::helpers::to_datetime;
 use crate::helpers::StatefulList;
+use crate::state::LibScreen;
 use crate::state::Screen;
 use crate::state::SourceScreen;
 use crate::ui::helpers::centered_sized_rect;
@@ -29,7 +30,9 @@ pub fn ui_main(f: &mut Frame, ctx: &mut Context, app_state: &mut AppState) {
         .split(f.size());
 
     // Render the tabs
-    if !(app_state.screen == Screen::Sources(SourceScreen::BookView)) {
+    if !(app_state.screen == Screen::Sources(SourceScreen::BookView)
+        || app_state.screen == Screen::Lib(LibScreen::BookView))
+    {
         render_tabs(chunks[0], ctx, app_state, f);
     }
 
@@ -44,7 +47,9 @@ pub fn ui_main(f: &mut Frame, ctx: &mut Context, app_state: &mut AppState) {
     }
 
     // Render command bar / controls
-    if !(app_state.screen == Screen::Sources(SourceScreen::BookView)) {
+    if !(app_state.screen == Screen::Sources(SourceScreen::BookView)
+        || app_state.screen == Screen::Lib(LibScreen::BookView))
+    {
         let text = if app_state.command_bar {
             format!(":{}_", app_state.buffer.text)
         } else {

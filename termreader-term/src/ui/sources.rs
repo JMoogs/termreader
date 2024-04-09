@@ -49,7 +49,7 @@ pub(super) fn render_sources(rect: Rect, ctx: &Context, app_state: &mut AppState
                 }
             }
             SourceScreen::SearchRes => render_search_results(rect, app_state, f),
-            SourceScreen::BookView => render_book_view(f, app_state),
+            SourceScreen::BookView => render_book_view(f, app_state, true),
         }
     }
 }
@@ -78,27 +78,36 @@ fn render_search_results(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
     f.render_stateful_widget(results, rect, app_state.buffer.novel_search_res.state_mut());
 }
 
-fn render_book_view(f: &mut Frame, app_state: &mut AppState) {
-    // TODO: Add support for displaying without the options for viewing a book
+pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, show_options: bool) {
     // We want to display:
     // 1) The title across the top
     // 2) The synopsis - left
-    // 3) Options - middle right
+    // 3) Options - middle right (conditional on `show_options`)
     // 4) The chapter list - bottom right
 
     let chunks_vert_1 = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(1)])
+        .constraints([
+            Constraint::Length(3), // The title bar
+            Constraint::Min(1),    // The rest of the contents
+        ])
         .split(f.size());
 
     let chunks_horiz = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .constraints([
+            Constraint::Percentage(60), // The synopsis
+            Constraint::Percentage(40), // Chapters and options
+        ])
         .split(chunks_vert_1[1]);
 
+    // Only use this split if we're displaying options
     let chunks_vert_2 = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
+        .constraints([
+            Constraint::Percentage(30), // Options
+            Constraint::Percentage(70), // Chapters
+        ])
         .split(chunks_horiz[1]);
 
     let novel = app_state.buffer.novel.as_ref().unwrap();
@@ -136,36 +145,38 @@ fn render_book_view(f: &mut Frame, app_state: &mut AppState) {
     f.render_widget(synopsis, chunks_horiz[0]);
 
     // Options
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title("Options")
-        .border_type(BorderType::Rounded)
-        .style(UNSELECTED_STYLE);
+    if show_options {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title("Options")
+            .border_type(BorderType::Rounded)
+            .style(UNSELECTED_STYLE);
 
-    let options = app_state.source_data.novel_options.clone();
-    let list: Vec<ListItem> = Vec::from(options)
-        .into_iter()
-        .map(|i| ListItem::new(i).style(UNSELECTED_STYLE))
-        .collect();
+        let options = app_state.source_data.novel_options.clone();
+        let list: Vec<ListItem> = Vec::from(options)
+            .into_iter()
+            .map(|i| ListItem::new(i).style(UNSELECTED_STYLE))
+            .collect();
 
-    let block = if app_state.source_data.novel_preview_selected_field
-        == SourceNovelPreviewSelection::Options
-    {
-        block.style(SELECTED_STYLE)
-    } else {
-        block
-    };
+        let block = if app_state.source_data.novel_preview_selected_field
+            == SourceNovelPreviewSelection::Options
+        {
+            block.style(SELECTED_STYLE)
+        } else {
+            block
+        };
 
-    let display = List::new(list)
-        .block(block)
-        .highlight_style(SELECTED_STYLE)
-        .highlight_symbol("> ");
+        let display = List::new(list)
+            .block(block)
+            .highlight_style(SELECTED_STYLE)
+            .highlight_symbol("> ");
 
-    f.render_stateful_widget(
-        display,
-        chunks_vert_2[0],
-        app_state.source_data.novel_options.state_mut(),
-    );
+        f.render_stateful_widget(
+            display,
+            chunks_vert_2[0],
+            app_state.source_data.novel_options.state_mut(),
+        );
+    }
 
     // Chapters
     let chapters = app_state
@@ -203,9 +214,17 @@ fn render_book_view(f: &mut Frame, app_state: &mut AppState) {
         .highlight_style(SELECTED_STYLE)
         .highlight_symbol("> ");
 
-    f.render_stateful_widget(
-        display,
-        chunks_vert_2[1],
-        app_state.buffer.chapter_previews.state_mut(),
-    );
+    if show_options {
+        f.render_stateful_widget(
+            display,
+            chunks_vert_2[1],
+            app_state.buffer.chapter_previews.state_mut(),
+        );
+    } else {
+        f.render_stateful_widget(
+            display,
+            chunks_horiz[1],
+            app_state.buffer.chapter_previews.state_mut(),
+        );
+    }
 }

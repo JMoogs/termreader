@@ -19,9 +19,10 @@ pub struct SourceData {
 }
 
 /// An enum representing the selected field when previewing a novel on the source page
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Default)]
 pub enum SourceNovelPreviewSelection {
     Summary,
+    #[default]
     Chapters,
     Options,
 }
@@ -39,7 +40,7 @@ impl SourceData {
                 String::from("Start from beginning"),
                 String::from("Add to library"),
             ]),
-            novel_preview_selected_field: SourceNovelPreviewSelection::Options,
+            novel_preview_selected_field: SourceNovelPreviewSelection::Chapters,
         }
     }
 

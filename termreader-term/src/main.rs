@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 pub mod appstate;
 pub mod controls;
+pub mod enter;
 pub mod helpers;
 pub mod logging;
 pub mod reader;
@@ -18,9 +19,12 @@ use crossterm::{
     event::{self, Event},
     execute, terminal,
 };
+use enter::enter_lib_book_view;
+use enter::enter_source_book_view;
 use helpers::StatefulList;
 use ratatui::prelude::*;
 use state::sources::SourceNovelPreviewSelection;
+use state::LibScreen;
 use state::SourceScreen;
 use termreader_core::Context;
 use ui::reader::ui_reader;
@@ -89,21 +93,11 @@ fn run_app<B: Backend>(
                         app_state.update_screen(Screen::Sources(SourceScreen::SearchRes));
                     }
                     RequestData::BookInfo((res, opt)) => {
-                        // app_state.buffer.clear();
-                        let res = res?;
-
+                        let novel = res?;
                         if opt {
-                            app_state.source_data.novel_preview_selected_field =
-                                SourceNovelPreviewSelection::Options;
-                        }
-                        app_state.buffer.chapter_previews =
-                            StatefulList::from(res.get_chapters().clone());
-                        app_state.buffer.novel = Some(res);
-
-                        if opt {
-                            app_state.update_screen(Screen::Sources(SourceScreen::BookView));
+                            enter_source_book_view(app_state, novel);
                         } else {
-                            todo!()
+                            enter_lib_book_view(app_state, novel);
                         }
                     }
                     RequestData::Chapter((id, res, ch)) => {

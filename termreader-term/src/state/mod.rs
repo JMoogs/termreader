@@ -190,6 +190,7 @@ pub enum Screen {
 pub enum LibScreen {
     Main,
     GlobalBookSelect,
+    BookView,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
