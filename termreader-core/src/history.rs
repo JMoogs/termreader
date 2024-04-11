@@ -43,6 +43,32 @@ impl HistoryContext {
         }
     }
 
+    pub(super) fn find_book_from_url(&self, url: String) -> Option<&Book> {
+        for entry in self.history.iter() {
+            if !entry.book.is_local() {
+                let novel = entry.book.global_get_novel();
+                if novel.get_full_url() == url {
+                    return Some(&entry.book);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub(super) fn find_book_from_url_mut(&mut self, url: String) -> Option<&mut Book> {
+        for entry in self.history.iter_mut() {
+            if !entry.book.is_local() {
+                let novel = entry.book.global_get_novel();
+                if novel.get_full_url() == url {
+                    return Some(&mut entry.book);
+                }
+            }
+        }
+
+        None
+    }
+
     pub(super) fn get_history_len(&self) -> usize {
         self.history.len()
     }

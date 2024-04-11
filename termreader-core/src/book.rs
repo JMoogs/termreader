@@ -8,12 +8,12 @@ use termreader_sources::{
     sources::{Scrape, Source, SourceID},
 };
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Book {
     id: ID,
     name: String,
     data: BookData,
-    category: Option<String>,
+    pub(crate) category: Option<String>,
 }
 
 impl PartialEq for Book {
@@ -170,12 +170,18 @@ impl Book {
 
     pub fn display_info(&self) -> String {
         if let BookData::Global(data) = &self.data {
+            let pct =
+                if (data.chapters_read_ordered as f64 / data.total_chapters as f64).is_finite() {
+                    100.0 * (data.chapters_read_ordered as f64 / data.total_chapters as f64)
+                } else {
+                    100.0
+                };
             format!(
                 "{} | Chapters read: {}/{} ({:.2}%)",
                 self.name.clone(),
                 data.chapters_read_ordered,
                 data.total_chapters,
-                data.chapters_read_ordered as f64 / data.total_chapters as f64
+                pct,
             )
         } else {
             return self.name.clone();
@@ -187,15 +193,26 @@ impl Book {
             data.update(source)
         }
     }
+
+    pub fn reset_progress(&mut self) {
+        match &mut self.data {
+            BookData::Local(d) => d.progress = ChapterProgress::Word((0, 0)),
+            BookData::Global(d) => {
+                d.chapters_read_ordered = 0;
+                d.current_chapter = 1;
+                d.chapter_progress = HashMap::new();
+            }
+        }
+    }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 enum BookData {
     Local(LocalData),
     Global(GlobalData),
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct LocalData {
     path: String,
     hash: String,
@@ -229,13 +246,13 @@ impl LocalData {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 enum BookFormat {
     Unknown,
     Txt,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct GlobalData {
     chapters_read_ordered: usize,
     current_chapter: usize,

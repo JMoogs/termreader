@@ -4,7 +4,7 @@ use crossterm::style::ContentStyle;
 use ratatui::widgets::ListState;
 use termreader_core::{book::Book, Context};
 
-use crate::helpers::StatefulList;
+use crate::{helpers::StatefulList, trace_dbg};
 
 /// Data related to the library tab
 pub struct LibData {
@@ -14,6 +14,8 @@ pub struct LibData {
     selected_book: ListState,
     /// Options for a selected global book
     pub global_selected_book_opts: StatefulList<String>,
+    /// Options for categories
+    pub category_options: StatefulList<String>,
 }
 
 impl LibData {
@@ -41,6 +43,12 @@ impl LibData {
                 String::from("Rename"),
                 String::from("Reset Progress"),
                 String::from("Remove book from library"),
+            ]),
+            category_options: StatefulList::from(vec![
+                String::from("Create categories"),
+                String::from("Re-order categories (Not yet implemented)"),
+                String::from("Rename categories"),
+                String::from("Delete categories"),
             ]),
         }
     }
@@ -87,6 +95,8 @@ impl LibData {
     /// Returns the size of the currently selected category
     pub fn get_current_category_size(&mut self, ctx: &Context) -> usize {
         let cat_name = &ctx.lib_get_categories()[self.get_selected_category()];
+        trace_dbg!(cat_name.clone());
+        trace_dbg!(ctx.lib_get_books().keys());
         ctx.lib_get_books().get(cat_name).unwrap().len()
     }
 

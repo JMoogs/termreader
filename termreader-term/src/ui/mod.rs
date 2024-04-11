@@ -101,6 +101,10 @@ fn render_selection_box(
             max_width = s.len();
         }
     }
+
+    // Ensure that the box name isn't too long for the box
+    max_width = max_width.max(box_name.len());
+
     max_width += 5; // + 2 for borders, + 2 for selection +1 to make it look better
 
     let list: Vec<ListItem> = options
@@ -140,4 +144,30 @@ fn render_type_box(rect: Rect, app_state: &mut AppState, f: &mut Frame, title: S
     let r = centered_sized_rect(40, 6, rect);
 
     f.render_widget(display, r)
+}
+
+fn render_selection_screen(
+    rect: Rect,
+    box_name: String,
+    selection: &mut StatefulList<String>,
+    f: &mut Frame,
+) {
+    let options = selection.items.clone();
+
+    let list: Vec<ListItem> = options
+        .into_iter()
+        .map(|i| ListItem::new(i).style(UNSELECTED_STYLE))
+        .collect();
+
+    let display = List::new(list)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(box_name)
+                .border_type(BorderType::Rounded),
+        )
+        .highlight_style(SELECTED_STYLE)
+        .highlight_symbol("> ");
+
+    f.render_stateful_widget(display, rect, selection.state_mut())
 }

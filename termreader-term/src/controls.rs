@@ -6,10 +6,12 @@ use termreader_core::Context;
 use termreader_sources::sources::{Scrape, SortOrder};
 
 use crate::enter::{
-    self, continue_reading_global_select, enter_global_book_select, enter_lib_book_view,
-    enter_typing,
+    self, continue_reading_global_select, create_category, delete_category, enter_category_options,
+    enter_category_select, enter_global_book_select, enter_history_book_view, enter_lib_book_view,
+    enter_typing, move_book_category, rename_category,
 };
 use crate::helpers::StatefulList;
+use crate::state::channels::BookInfoDetails;
 use crate::{
     state::{
         channels::RequestData, sources::SourceNovelPreviewSelection, AppState, HistoryScreen,
@@ -19,6 +21,7 @@ use crate::{
 };
 
 pub fn handle_controls(ctx: &mut Context, app_state: &mut AppState, mut key: KeyCode) {
+    // Handle typing seperately to other controls
     if app_state.typing {
         handle_typing(ctx, app_state, key);
         return;
@@ -48,7 +51,9 @@ pub fn handle_controls(ctx: &mut Context, app_state: &mut AppState, mut key: Key
             LibScreen::GlobalBookSelect => {
                 control_library_global_book_select(ctx, app_state, key);
             }
-            LibScreen::BookView => control_lib_book_view(ctx, app_state, key),
+            LibScreen::BookView => control_book_view_no_opts(ctx, app_state, key),
+            LibScreen::CategorySelect => control_library_category_select(ctx, app_state, key),
+            LibScreen::CategoryOptions => control_library_category_options(ctx, app_state, key),
         },
         Screen::Updates(s) => match s {
             UpdateScreen::Main => control_main_menu(app_state, key),
@@ -71,10 +76,85 @@ pub fn handle_controls(ctx: &mut Context, app_state: &mut AppState, mut key: Key
             }
             HistoryScreen::LocalBookOptions => todo!(),
             HistoryScreen::GlobalBookOptions => control_history_global_book(ctx, app_state, key),
+            HistoryScreen::BookView => control_book_view_no_opts(ctx, app_state, key),
         },
         Screen::Settings(s) => match s {
             SettingsScreen::Main => control_main_menu(app_state, key),
         },
+    }
+}
+
+fn control_library_category_select(ctx: &mut Context, app_state: &mut AppState, key: KeyCode) {
+    match key {
+        KeyCode::Up => app_state.buffer.temporary_list.previous(),
+        KeyCode::Down => app_state.buffer.temporary_list.next(),
+        KeyCode::Enter => {
+            if app_state
+                .prev_screens
+                .last()
+                .expect("it should be impossible to start directly into this screen")
+                == &Screen::Lib(LibScreen::GlobalBookSelect)
+            {
+                // We're moving a book to a different category
+                move_book_category(app_state, ctx)
+                    .expect("a book or category was not selected when it should have been")
+            } else {
+                // We're managing categories
+                match app_state
+                    .lib_data
+                    .category_options
+                    .selected_idx()
+                    .expect("an option should always be seleceted")
+                {
+                    0 | 1 => unreachable!(),
+                    // Rename
+                    2 => enter_typing(app_state),
+                    // Delete
+                    3 => {
+                        let deleted = delete_category(
+                            app_state,
+                            ctx,
+                            app_state
+                                .buffer
+                                .temporary_list
+                                .selected()
+                                .expect("a category should always be selected")
+                                .to_string(),
+                        );
+                        // Do nothing if the category wasn't deleted, but if it was, go back
+                        if deleted.is_ok() {
+                            app_state.update_screen(Screen::Lib(LibScreen::Main))
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+
+        _ => (),
+    }
+}
+
+fn control_library_category_options(ctx: &mut Context, app_state: &mut AppState, key: KeyCode) {
+    match key {
+        KeyCode::Up => app_state.lib_data.category_options.previous(),
+        KeyCode::Down => app_state.lib_data.category_options.next(),
+        KeyCode::Enter => match app_state
+            .lib_data
+            .category_options
+            .selected_idx()
+            .expect("an option should always be selected")
+        {
+            // Create category
+            0 => enter_typing(app_state),
+            // Re-order categories
+            1 => (),
+            // Rename categories / Delete categories
+            2 | 3 => enter_category_select(app_state, ctx),
+            _ => unreachable!(),
+        },
+        KeyCode::Char('c') => app_state.update_screen(Screen::Lib(LibScreen::Main)),
+        _ => (),
     }
 }
 
@@ -103,9 +183,7 @@ fn control_library_menu(ctx: &Context, app_state: &mut AppState, key: KeyCode) {
         KeyCode::Enter => {
             let _ = enter_global_book_select(app_state);
         }
-        KeyCode::Char('c') => {
-            todo!()
-        }
+        KeyCode::Char('c') => enter_category_options(app_state),
         _ => (),
     }
 }
@@ -136,9 +214,7 @@ fn control_library_global_book_select(ctx: &mut Context, app_state: &mut AppStat
                         .expect("a book has not been selected, even though this menu is only accessible on a selected book");
                     enter_lib_book_view(app_state, book.global_get_novel().clone())
                 }
-                2 => {
-                    todo!()
-                }
+                2 => enter_category_select(app_state, ctx),
                 3 => enter_typing(app_state),
                 4 => {
                     let book = app_state.lib_data
@@ -216,7 +292,11 @@ fn control_search_res(ctx: &Context, app_state: &mut AppState, key: KeyCode) {
                 app_state.channel.loading = true;
                 thread::spawn(move || {
                     let book = source.parse_novel_and_chapters(url);
-                    tx.send(RequestData::BookInfo((book, true))).unwrap();
+                    tx.send(RequestData::BookInfo((
+                        book,
+                        BookInfoDetails::SourceWithOptions,
+                    )))
+                    .unwrap();
                 });
             }
         }
@@ -263,6 +343,20 @@ fn handle_typing(ctx: &mut Context, app_state: &mut AppState, key: KeyCode) {
                         book.rename(book.global_get_novel().get_name().to_string());
                     }
                     app_state.buffer.text.clear()
+                }
+                // Creating a category
+                Screen::Lib(LibScreen::CategoryOptions) => {
+                    let created =
+                        create_category(app_state, ctx, app_state.buffer.text.to_string());
+                    // Do nothing if we can't create the category
+                    if created.is_ok() {
+                        app_state.update_screen(Screen::Lib(LibScreen::Main))
+                    }
+                }
+                // Renaming a category
+                Screen::Lib(LibScreen::CategorySelect) => {
+                    rename_category(app_state, ctx, app_state.buffer.text.to_string());
+                    app_state.update_screen(Screen::Lib(LibScreen::Main))
                 }
                 _ => unreachable!(),
             }
@@ -331,7 +425,15 @@ fn control_source_book_view(ctx: &mut Context, app_state: &mut AppState, key: Ke
                         0 => {
                             let novel = app_state.buffer.novel.clone().unwrap();
                             let nov2 = novel.clone();
-                            let book = Book::from_novel(novel);
+
+                            let book = if let Some(book) =
+                                ctx.find_book_by_url(novel.get_full_url().to_string())
+                            {
+                                book.clone()
+                            } else {
+                                Book::from_novel(novel)
+                            };
+
                             let id = book.get_id();
                             // TODO: Add some display symbolizing there are no chapters maybe
                             if book.global_get_total_chs() == 0 {
@@ -355,7 +457,16 @@ fn control_source_book_view(ctx: &mut Context, app_state: &mut AppState, key: Ke
                         // Add to lib
                         1 => {
                             let novel = app_state.buffer.novel.clone().unwrap();
-                            ctx.lib_add_book(Book::from_novel(novel), None);
+
+                            let book = if let Some(book) =
+                                ctx.find_book_by_url(novel.get_full_url().to_string())
+                            {
+                                book.clone()
+                            } else {
+                                Book::from_novel(novel)
+                            };
+
+                            ctx.lib_add_book(book, None);
                             // If there were previously no books selected then select this one
                             app_state.lib_data.fix_book_selection_state(ctx);
                             app_state.screen = app_state.prev_screens.pop().unwrap();
@@ -373,7 +484,15 @@ fn control_source_book_view(ctx: &mut Context, app_state: &mut AppState, key: Ke
                     let ch_no = ch.get_chapter_no();
                     let novel = app_state.buffer.novel.clone().unwrap();
                     let nov2 = novel.clone();
-                    let book = Book::from_novel(novel);
+
+                    let book = if let Some(book) =
+                        ctx.find_book_by_url(novel.get_full_url().to_string())
+                    {
+                        book.clone()
+                    } else {
+                        Book::from_novel(novel)
+                    };
+
                     let id = book.get_id();
 
                     let source_id = book.global_get_source_id();
@@ -396,7 +515,7 @@ fn control_source_book_view(ctx: &mut Context, app_state: &mut AppState, key: Ke
     }
 }
 
-fn control_lib_book_view(ctx: &Context, app_state: &mut AppState, key: KeyCode) {
+fn control_book_view_no_opts(ctx: &Context, app_state: &mut AppState, key: KeyCode) {
     match key {
         KeyCode::Char(']') | KeyCode::Tab => {
             match app_state.source_data.novel_preview_selected_field {
@@ -449,9 +568,17 @@ fn control_lib_book_view(ctx: &Context, app_state: &mut AppState, key: KeyCode) 
                     .unwrap()
                     .clone();
                 let ch_no = ch.get_chapter_no();
+
                 let novel = app_state.buffer.novel.clone().unwrap();
-                let nov2 = novel.clone();
-                let book = Book::from_novel(novel);
+                let novel_thread = novel.clone();
+
+                let book =
+                    if let Some(book) = ctx.find_book_by_url(novel.get_full_url().to_string()) {
+                        book.clone()
+                    } else {
+                        Book::from_novel(novel)
+                    };
+
                 let id = book.get_id();
 
                 let source_id = book.global_get_source_id();
@@ -462,8 +589,8 @@ fn control_lib_book_view(ctx: &Context, app_state: &mut AppState, key: KeyCode) 
                 app_state.channel.loading = true;
                 thread::spawn(move || {
                     let text = source.parse_chapter(
-                        nov2.get_url().to_string(),
-                        nov2.get_chapter_url(ch_no).unwrap(),
+                        novel_thread.get_url().to_string(),
+                        novel_thread.get_chapter_url(ch_no).unwrap(),
                     );
                     let _ = tx.send(RequestData::Chapter((id, text, ch_no)));
                 });
@@ -585,41 +712,79 @@ fn control_history_global_book(ctx: &mut Context, app_state: &mut AppState, key:
                 .get_selected_book(ctx)
                 .expect("A book was selected without being selected?");
 
-            let ch = b.get_chapter();
-            let b = b.get_book();
+            let book = b.get_book();
 
             match opt {
-                0 | 1 => {
-                    // Continue reading or view the book
-                    let novel = b.global_get_novel().clone();
-                    let id = b.get_id();
+                0 => {
+                    // Continue reading
+                    let ch = b.get_chapter();
+                    let novel = book.global_get_novel().clone();
+                    let id = book.get_id();
                     let source = ctx.source_get_by_id(novel.get_source()).unwrap().clone();
                     let tx = app_state.channel.get_sender();
                     app_state.channel.loading = true;
-
-                    if opt == 0 {
-                        // Continue reading
-                        thread::spawn(move || {
-                            let text = source.parse_chapter(
-                                novel.get_url().to_string(),
-                                novel.get_chapter_url(ch).unwrap(),
-                            );
-                            tx.send(RequestData::Chapter((id, text, ch)))
-                        });
-                    } else {
-                        // View book
-                        app_state.channel.loading = true;
-                        thread::spawn(move || {
-                            let novel_info =
-                                source.parse_novel_and_chapters(novel.get_url().to_string());
-                            let _ = tx.send(RequestData::BookInfo((novel_info, false)));
-                        });
+                    thread::spawn(move || {
+                        let text = source.parse_chapter(
+                            novel.get_url().to_string(),
+                            novel.get_chapter_url(ch).unwrap(),
+                        );
+                        let _ = tx.send(RequestData::Chapter((id, text, ch)));
+                    });
+                }
+                1 => {
+                    // View book
+                    let lib_copy = ctx.lib_find_book(book.get_id());
+                    match lib_copy {
+                        Some(lib_book) => {
+                            enter_history_book_view(app_state, lib_book.global_get_novel().clone());
+                        }
+                        None => {
+                            let novel = book.global_get_novel().clone();
+                            let source = ctx.source_get_by_id(novel.get_source()).unwrap().clone();
+                            let tx = app_state.channel.get_sender();
+                            app_state.channel.loading = true;
+                            thread::spawn(move || {
+                                let info =
+                                    source.parse_novel_and_chapters(novel.get_url().to_string());
+                                let _ = tx.send(RequestData::BookInfo((
+                                    info,
+                                    BookInfoDetails::HistoryWithOptions,
+                                )));
+                            });
+                        }
                     }
+                    // app_state.channel.loading = true;
+                    // thread::spawn(move || {
+                    //     let novel_info =
+                    //         source.parse_novel_and_chapters(novel.get_url().to_string());
+                    //     let _ = tx.send(RequestData::BookInfo((novel_info, false)));
+                    // });
                 }
                 2 => {
                     // Remove from history
-                    ctx.hist_remove_entry(b.get_id());
-                    app_state.history_data.get_selected_entry_mut().select(None);
+                    ctx.hist_remove_entry(book.get_id());
+
+                    // Select the previous entry if one exists
+                    let sel = app_state
+                        .history_data
+                        .get_selected_entry_mut()
+                        .selected()
+                        .expect("we just removed an entry from history so it must have an index");
+                    if sel == 0 {
+                        if ctx.hist_get_len() == 0 {
+                            app_state.history_data.get_selected_entry_mut().select(None);
+                        } else {
+                            app_state
+                                .history_data
+                                .get_selected_entry_mut()
+                                .select(Some(0));
+                        }
+                    } else {
+                        app_state
+                            .history_data
+                            .get_selected_entry_mut()
+                            .select(Some(sel - 1));
+                    }
                     app_state.update_screen(Screen::History(HistoryScreen::Main));
                 }
                 _ => unreachable!(),

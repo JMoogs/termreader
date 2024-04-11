@@ -52,6 +52,50 @@ impl LibraryContext {
         None
     }
 
+    pub(super) fn find_book_from_url(&self, url: String) -> Option<&Book> {
+        let lists = self.books.values();
+
+        for list in lists {
+            let search = list.iter().find(|i| {
+                if !i.is_local() {
+                    let novel = i.global_get_novel();
+                    novel.get_full_url() == url
+                } else {
+                    false
+                }
+            });
+            if search.is_none() {
+                continue;
+            }
+            let res = search.unwrap();
+            return Some(res);
+        }
+
+        None
+    }
+
+    pub(super) fn find_book_from_url_mut(&mut self, url: String) -> Option<&mut Book> {
+        let lists = self.books.values_mut();
+
+        for list in lists {
+            let search = list.iter_mut().find(|i| {
+                if !i.is_local() {
+                    let novel = i.global_get_novel();
+                    novel.get_full_url() == url
+                } else {
+                    false
+                }
+            });
+            if search.is_none() {
+                continue;
+            }
+            let res = search.unwrap();
+            return Some(res);
+        }
+
+        None
+    }
+
     pub(super) fn remove_book(&mut self, id: ID) {
         let lists = self.books.values_mut();
 
@@ -65,39 +109,58 @@ impl LibraryContext {
         }
     }
 
-    pub(super) fn add_book(&mut self, book: Book, category: Option<String>) {
+    /// Add a book to a given category, or the default category if a category isn't given
+    ///
+    /// This function checks if the book is already in the user's library before adding it
+    pub(super) fn add_book(&mut self, book: Book, category: Option<&str>) {
+        if self.find_book(book.get_id()).is_some() {
+            return;
+        }
+
         match category {
             None => {
                 let l = self.books.get_mut(&self.default_category_name).unwrap();
                 l.push(book);
             }
-            Some(c) => match self.books.get_mut(&c) {
+            Some(c) => match self.books.get_mut(c) {
                 Some(list) => list.push(book),
                 None => self.add_book(book, None),
             },
         }
     }
 
-    pub(super) fn move_category(&mut self, id: ID, category_name: Option<String>) {
+    pub(super) fn move_category(&mut self, id: ID, category_name: Option<&str>) {
+        // Don't move to a non-exsiting category
+        if category_name.is_some_and(|cat| !self.get_categories().contains(&cat.to_string())) {
+            return;
+        }
         if let Some(book) = self.find_book(id).cloned() {
+            // If the category is the same as the current one do nothing
+            if let (Some(b_cat), Some(cat)) = (&book.category, category_name) {
+                if b_cat == cat {
+                    return;
+                }
+            }
+
             self.remove_book(id);
             self.add_book(book, category_name);
         }
     }
 
-    pub(super) fn create_category(&mut self, name: String) {
+    pub(super) fn create_category(&mut self, name: String) -> Result<(), ()> {
         // Don't allow multiple categories with the same name.
         if self.books.contains_key(&name) {
-            return;
+            return Err(());
         }
         self.books.insert(name.clone(), Vec::new());
         self.category_order.push(name);
+        Ok(())
     }
 
-    pub(super) fn delete_category(&mut self, name: String) {
+    pub(super) fn delete_category(&mut self, name: String) -> Result<(), ()> {
         // Don't allow the default category to be deleted.
         if self.default_category_name == name {
-            return;
+            return Err(());
         }
 
         if let Some(v) = self.books.remove(&name) {
@@ -107,6 +170,8 @@ impl LibraryContext {
             }
             self.category_order.retain(|x| x != &name)
         }
+
+        Ok(())
     }
 
     pub(super) fn rename_category(&mut self, old_name: String, new_name: String) {

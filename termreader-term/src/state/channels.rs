@@ -14,12 +14,18 @@ use termreader_sources::{
 pub enum RequestData {
     /// The results of a search
     SearchResults(Result<Vec<NovelPreview>>),
-    /// Info about a novel. The bool signifies whether or not to show an options menu.
-    BookInfo((Result<Novel>, bool)),
+    /// Info about a novel.
+    BookInfo((Result<Novel>, BookInfoDetails)),
     /// A chapter and it's number (TODO: Add chapter number details to chapters if possible)
     Chapter((ID, Result<Chapter>, usize)),
     // /// Update info for a book
     // Updated(Book),
+}
+
+pub enum BookInfoDetails {
+    SourceNoOptions,
+    SourceWithOptions,
+    HistoryWithOptions,
 }
 
 pub struct ChannelData {

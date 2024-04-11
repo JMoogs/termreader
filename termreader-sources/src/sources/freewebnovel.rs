@@ -124,7 +124,11 @@ impl Scrape for FreeWebNovelScraper {
             .unwrap()
             .inner_html();
         let ch_no = Regex::new(r"\d+").unwrap();
-        let latest_ch_no: usize = ch_no.find(&latest_chap).unwrap().as_str().parse().unwrap();
+        let latest_ch_no = ch_no.find(&latest_chap);
+        let latest_ch_no = match latest_ch_no {
+            Some(ch) => ch.as_str().parse().unwrap_or(0),
+            None => 0,
+        };
 
         for i in 1..=latest_ch_no {
             let ch = ChapterPreview {

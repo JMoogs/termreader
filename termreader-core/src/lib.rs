@@ -73,20 +73,26 @@ impl Context {
         self.library.remove_book(id);
     }
 
-    pub fn lib_add_book(&mut self, book: Book, category: Option<String>) {
+    /// Add a book to a given category, or the default category if a category isn't given
+    ///
+    /// This function checks if the book is already in the user's library before adding it
+    pub fn lib_add_book(&mut self, book: Book, category: Option<&str>) {
         self.library.add_book(book, category);
     }
 
-    pub fn lib_move_book_category(&mut self, id: ID, category: Option<String>) {
+    /// Move a book from one category to another. If no category is provided,
+    /// the book is moved to the default category
+    pub fn lib_move_book_category(&mut self, id: ID, category: Option<&str>) {
         self.library.move_category(id, category);
     }
 
-    pub fn lib_create_category(&mut self, name: String) {
-        self.library.create_category(name);
+    pub fn lib_create_category(&mut self, name: String) -> Result<(), ()> {
+        self.library.create_category(name)
     }
 
-    pub fn lib_delete_category(&mut self, name: String) {
-        self.library.delete_category(name);
+    /// Deletes a category, failing if the category being deleted is the default category
+    pub fn lib_delete_category(&mut self, name: String) -> Result<(), ()> {
+        self.library.delete_category(name)
     }
 
     pub fn lib_rename_category(&mut self, old_name: String, new_name: String) {
@@ -111,5 +117,18 @@ impl Context {
 
     pub fn source_get_info(&self) -> Vec<(SourceID, String)> {
         self.sources.get_source_info()
+    }
+
+    /// Finds whether a book already exists for a given URL, returning it if it does
+    pub fn find_book_by_url(&self, url: String) -> Option<&Book> {
+        self.history
+            .find_book_from_url(url.clone())
+            .or_else(|| self.library.find_book_from_url(url))
+    }
+
+    pub fn find_book_by_url_mut(&mut self, url: String) -> Option<&mut Book> {
+        self.history
+            .find_book_from_url_mut(url.clone())
+            .or_else(|| self.library.find_book_from_url_mut(url))
     }
 }

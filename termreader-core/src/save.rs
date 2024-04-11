@@ -3,7 +3,11 @@ use anyhow::Result;
 use std::fs;
 
 pub(super) fn store_library(library: &LibraryContext) -> Result<()> {
-    let json = serde_json::to_string_pretty(library)?;
+    let json = if cfg!(debug_assertations) {
+        serde_json::to_string_pretty(library)?
+    } else {
+        serde_json::to_string(library)?
+    };
     fs::write("books.json", json)?;
     Ok(())
 }
@@ -17,7 +21,11 @@ pub(super) fn load_library() -> Result<LibraryContext> {
 }
 
 pub(super) fn store_history(history: &HistoryContext) -> Result<()> {
-    let json = serde_json::to_string_pretty(history)?;
+    let json = if cfg!(debug_assertations) {
+        serde_json::to_string_pretty(history)?
+    } else {
+        serde_json::to_string(history)?
+    };
     fs::write("history.json", json)?;
     Ok(())
 }

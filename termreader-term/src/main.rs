@@ -19,10 +19,12 @@ use crossterm::{
     event::{self, Event},
     execute, terminal,
 };
+use enter::enter_history_book_view;
 use enter::enter_lib_book_view;
 use enter::enter_source_book_view;
 use helpers::StatefulList;
 use ratatui::prelude::*;
+use state::channels::BookInfoDetails;
 use state::sources::SourceNovelPreviewSelection;
 use state::LibScreen;
 use state::SourceScreen;
@@ -92,12 +94,18 @@ fn run_app<B: Backend>(
                         app_state.buffer.novel_search_res = StatefulList::from(res?);
                         app_state.update_screen(Screen::Sources(SourceScreen::SearchRes));
                     }
-                    RequestData::BookInfo((res, opt)) => {
+                    RequestData::BookInfo((res, info)) => {
                         let novel = res?;
-                        if opt {
-                            enter_source_book_view(app_state, novel);
-                        } else {
-                            enter_lib_book_view(app_state, novel);
+                        match info {
+                            BookInfoDetails::SourceNoOptions => {
+                                enter_lib_book_view(app_state, novel);
+                            }
+                            BookInfoDetails::SourceWithOptions => {
+                                enter_source_book_view(app_state, novel);
+                            }
+                            BookInfoDetails::HistoryWithOptions => {
+                                enter_history_book_view(app_state, novel);
+                            }
                         }
                     }
                     RequestData::Chapter((id, res, ch)) => {

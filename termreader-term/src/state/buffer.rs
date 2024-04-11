@@ -14,12 +14,14 @@ pub struct Buffer {
     pub novel_search_res: StatefulList<NovelPreview>,
     /// The chapter prewiews of a novel
     pub chapter_previews: StatefulList<ChapterPreview>,
-    /// The novel currently being viewed
+    /// The novel/book currently being viewed
     pub novel: Option<Novel>,
     /// How far scrolled the novel description is in a preview
     pub novel_preview_scroll: usize,
     /// A book being read directly from the sources page
     pub book: Option<Book>,
+    /// A temporary stateful list
+    pub temporary_list: StatefulList<String>,
 }
 
 impl Buffer {
@@ -32,6 +34,7 @@ impl Buffer {
             novel: None,
             novel_preview_scroll: 0,
             book: None,
+            temporary_list: StatefulList::new(),
         }
     }
 
