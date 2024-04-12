@@ -131,4 +131,21 @@ impl Context {
             .find_book_from_url_mut(url.clone())
             .or_else(|| self.library.find_book_from_url_mut(url))
     }
+
+    pub fn find_book(&self, id: ID) -> Option<&Book> {
+        Some(
+            self.library
+                .find_book(id)
+                .or_else(|| self.history.find_book(id))?,
+        )
+    }
+
+    pub fn find_book_mut(&mut self, id: ID) -> Option<&mut Book> {
+        let b = self.library.find_book_mut(id);
+        if b.is_some() {
+            return b;
+        }
+
+        Some(self.history.find_book_mut(id)?)
+    }
 }

@@ -3,8 +3,8 @@ resolver = "2"
 members = [
   "termreader-sources",  
   "termreader-term",
-  "termreader-core"
-]
+  "termreader-core",
+ ]
 
 [workspace.package]
 name = "termreader"

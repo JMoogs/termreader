@@ -1,4 +1,4 @@
-use crate::id::ID;
+use crate::{id::ID, Context};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -203,6 +203,11 @@ impl Book {
                 d.chapter_progress = HashMap::new();
             }
         }
+    }
+
+    pub fn get_source(&self, ctx: &Context) -> Source {
+        let s_id = self.global_get_source_id();
+        ctx.sources.get_source_by_id(s_id).unwrap().clone()
     }
 }
 

@@ -1,10 +1,5 @@
-use std::time::SystemTime;
-
 // This module contains data relating to when the user is reading a book
-use termreader_core::{
-    book::{Book, ChapterProgress},
-    Context,
-};
+use termreader_core::book::{Book, ChapterProgress};
 use termreader_sources::chapter::Chapter;
 
 use crate::reader::{GlobalReader, GlobalReaderContents, GlobalReaderState};

@@ -1,10 +1,11 @@
-#![allow(dead_code, unused_imports, unused_variables)]
+// #![allow(dead_code, unused_imports, unused_variables)]
+
 pub mod appstate;
 pub mod controls;
-pub mod enter;
 pub mod helpers;
 pub mod logging;
 pub mod reader;
+pub mod setup;
 pub mod state;
 pub mod ui;
 
@@ -19,14 +20,12 @@ use crossterm::{
     event::{self, Event},
     execute, terminal,
 };
-use enter::enter_history_book_view;
-use enter::enter_lib_book_view;
-use enter::enter_source_book_view;
 use helpers::StatefulList;
 use ratatui::prelude::*;
+use setup::enter_book_view;
+use setup::BookViewType;
+use state::channels::BookInfo;
 use state::channels::BookInfoDetails;
-use state::sources::SourceNovelPreviewSelection;
-use state::LibScreen;
 use state::SourceScreen;
 use termreader_core::Context;
 use ui::reader::ui_reader;
@@ -82,7 +81,7 @@ fn run_app<B: Backend>(
             break;
         }
         match app_state.screen {
-            Screen::Reader => terminal.draw(|f| ui_reader(f, ctx, app_state))?,
+            Screen::Reader => terminal.draw(|f| ui_reader(f, app_state))?,
             _ => terminal.draw(|f| ui_main(f, ctx, app_state))?,
         };
 
@@ -97,28 +96,31 @@ fn run_app<B: Backend>(
                     RequestData::BookInfo((res, info)) => {
                         let novel = res?;
                         match info {
-                            BookInfoDetails::SourceNoOptions => {
-                                enter_lib_book_view(app_state, novel);
-                            }
                             BookInfoDetails::SourceWithOptions => {
-                                enter_source_book_view(app_state, novel);
+                                enter_book_view(app_state, novel, BookViewType::Source);
                             }
                             BookInfoDetails::HistoryWithOptions => {
-                                enter_history_book_view(app_state, novel);
+                                enter_book_view(app_state, novel, BookViewType::History);
                             }
+                            _ => unreachable!(),
                         }
                     }
-                    RequestData::Chapter((id, res, ch)) => {
-                        let book = ctx.lib_find_book_mut(id);
-                        let mut book = if let Some(b) = book {
-                            b.clone()
-                        } else {
-                            app_state.buffer.book.clone().unwrap()
-                        };
-
-                        book.global_set_ch(ch);
-                        app_state.move_to_reader(book, Some(res?));
-                    }
+                    RequestData::Chapter((book_info, res, ch)) => match book_info {
+                        BookInfo::NewBook(mut b) => {
+                            b.global_set_ch(ch);
+                            app_state.move_to_reader(b, Some(res?));
+                        }
+                        BookInfo::ID(id) => {
+                            let book = ctx.find_book_mut(id);
+                            match book {
+                                    Some(b) => {
+                                        b.global_set_ch(ch);
+                                        app_state.move_to_reader(b.clone(), Some(res?) );
+                                    },
+                                    None => panic!("Book existed so we returned an ID, but we were unable to find it?"),
+                                }
+                        }
+                    },
                 }
                 app_state.channel.loading = false;
                 // `event::read()` is blocking so continue to redraw after

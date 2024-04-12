@@ -69,6 +69,18 @@ impl HistoryContext {
         None
     }
 
+    pub(super) fn find_book(&self, id: ID) -> Option<&Book> {
+        // for entry in self.history.iter() {
+        // }
+        let e = self.history.iter().find(|e| e.book.get_id() == id);
+        Some(&e?.book)
+    }
+
+    pub(super) fn find_book_mut(&mut self, id: ID) -> Option<&mut Book> {
+        let e = self.history.iter_mut().find(|e| e.book.get_id() == id);
+        Some(&mut e?.book)
+    }
+
     pub(super) fn get_history_len(&self) -> usize {
         self.history.len()
     }

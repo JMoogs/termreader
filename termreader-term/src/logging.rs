@@ -3,7 +3,7 @@ use directories::ProjectDirs;
 use lazy_static::lazy_static;
 use std::path::PathBuf;
 use tracing_error::ErrorLayer;
-use tracing_subscriber::{self, layer::SubscriberExt, util::SubscriberInitExt, Layer};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
 lazy_static! {
     pub static ref PROJECT_NAME: String = env!("CARGO_CRATE_NAME").to_uppercase().to_string();

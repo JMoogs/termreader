@@ -1,6 +1,5 @@
 // This module contains data related to the library tab of the TUI.
 
-use crossterm::style::ContentStyle;
 use ratatui::widgets::ListState;
 use termreader_core::{book::Book, Context};
 

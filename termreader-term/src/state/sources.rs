@@ -27,6 +27,34 @@ pub enum SourceNovelPreviewSelection {
     Options,
 }
 
+impl SourceNovelPreviewSelection {
+    pub fn next_opts(&mut self) {
+        *self = match self {
+            SourceNovelPreviewSelection::Summary => SourceNovelPreviewSelection::Options,
+            SourceNovelPreviewSelection::Chapters => SourceNovelPreviewSelection::Summary,
+            SourceNovelPreviewSelection::Options => SourceNovelPreviewSelection::Chapters,
+        }
+    }
+
+    pub fn prev_opts(&mut self) {
+        *self = match self {
+            SourceNovelPreviewSelection::Summary => SourceNovelPreviewSelection::Chapters, SourceNovelPreviewSelection::Chapters => SourceNovelPreviewSelection::Options, SourceNovelPreviewSelection::Options => SourceNovelPreviewSelection::Summary,
+        }
+    }
+
+    pub fn next_no_opts(&mut self) {
+        *self = match self {
+            SourceNovelPreviewSelection::Summary => SourceNovelPreviewSelection::Chapters,
+            SourceNovelPreviewSelection::Chapters => SourceNovelPreviewSelection::Summary,
+            SourceNovelPreviewSelection::Options => unreachable!(),
+        }
+    }
+
+    pub fn prev_no_opts(&mut self) {
+        self.next_no_opts();
+    }
+}
+
 impl SourceData {
     /// Creates an instance of SourceData
     pub fn build() -> Self {

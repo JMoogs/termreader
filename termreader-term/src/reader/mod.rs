@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 use ratatui::{style::Style, widgets::StatefulWidget};
 use termreader_core::book::ChapterProgress;
 use termreader_sources::chapter::Chapter;
@@ -172,10 +170,10 @@ impl GlobalReader {
     }
 
     /// Scroll up 1 line
-    pub fn scroll_up(&mut self, term_width: u16, term_height: u16) {
-        let current_display =
-            self.contents
-                .get_display_lines(&mut self.state, term_width, term_height);
+    pub fn scroll_up(&mut self, term_width: u16, _term_height: u16) {
+        // let current_display =
+        //     self.contents
+        //         .get_display_lines(&mut self.state, term_width, term_height);
 
         // If we have a previous value (terminal hasn't been resized since scrolling down)
         // we can just use that.

@@ -4,7 +4,6 @@ pub mod library;
 pub mod reader;
 pub mod sources;
 
-use crate::helpers::to_datetime;
 use crate::helpers::StatefulList;
 use crate::state::LibScreen;
 use crate::state::Screen;
@@ -33,7 +32,7 @@ pub fn ui_main(f: &mut Frame, ctx: &mut Context, app_state: &mut AppState) {
     if !(app_state.screen == Screen::Sources(SourceScreen::BookView)
         || app_state.screen == Screen::Lib(LibScreen::BookView))
     {
-        render_tabs(chunks[0], ctx, app_state, f);
+        render_tabs(chunks[0], app_state, f);
     }
 
     // Render the body of the content, depending on the selected tab
@@ -68,7 +67,7 @@ pub fn ui_main(f: &mut Frame, ctx: &mut Context, app_state: &mut AppState) {
 }
 
 /// Renders the different tabs
-fn render_tabs(rect: Rect, ctx: &Context, app_state: &AppState, f: &mut Frame) {
+fn render_tabs(rect: Rect, app_state: &AppState, f: &mut Frame) {
     let titles: Vec<Line> = Vec::from(app_state.menu_tabs.clone())
         .into_iter()
         .map(|t| Line::from(t).alignment(Alignment::Center))

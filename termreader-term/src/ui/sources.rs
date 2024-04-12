@@ -17,7 +17,6 @@ pub(super) fn render_sources(rect: Rect, ctx: &Context, app_state: &mut AppState
                     .into_iter()
                     .map(|(_, name)| ListItem::new(name).style(UNSELECTED_STYLE))
                     .collect();
-                let source_len = display_data.len();
 
                 let sources = List::new(display_data)
                     .block(

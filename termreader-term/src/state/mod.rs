@@ -1,18 +1,10 @@
 use crate::helpers::StatefulList;
 use crate::state::reader::ReaderData;
 use crate::trace_dbg;
-use anyhow::Result;
-use ratatui::widgets::ListState;
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::SystemTime;
 use termreader_core::book::Book;
-use termreader_core::id::ID;
 use termreader_core::Context;
 use termreader_sources::chapter::Chapter;
-use termreader_sources::chapter::ChapterPreview;
-use termreader_sources::novel::Novel;
-use termreader_sources::novel::NovelPreview;
-use termreader_sources::sources::SourceID;
 
 use self::buffer::Buffer;
 use self::channels::ChannelData;
@@ -161,7 +153,6 @@ impl AppState {
         // Maybe do it on the full novel link (hash works for local books)
         ctx.hist_remove_entry(b.get_id());
 
-        let ch = b.global_get_current_ch();
         let timestamp = {
             let now = SystemTime::now();
             now.duration_since(SystemTime::UNIX_EPOCH)

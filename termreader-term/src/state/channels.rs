@@ -3,7 +3,7 @@
 // This is required as async is not used.
 use anyhow::Result;
 use std::sync::mpsc::{Receiver, Sender};
-use termreader_core::id::ID;
+use termreader_core::{book::Book, id::ID};
 use termreader_sources::{
     chapter::Chapter,
     novel::{Novel, NovelPreview},
@@ -17,9 +17,14 @@ pub enum RequestData {
     /// Info about a novel.
     BookInfo((Result<Novel>, BookInfoDetails)),
     /// A chapter and it's number (TODO: Add chapter number details to chapters if possible)
-    Chapter((ID, Result<Chapter>, usize)),
+    Chapter((BookInfo, Result<Chapter>, usize)),
     // /// Update info for a book
     // Updated(Book),
+}
+
+pub enum BookInfo {
+    NewBook(Book),
+    ID(ID),
 }
 
 pub enum BookInfoDetails {

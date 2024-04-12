@@ -1,10 +1,9 @@
-use crate::{trace_dbg, AppState};
+use crate::AppState;
 use chrono::Local;
-use termreader_core::Context;
 
 use ratatui::{prelude::*, widgets::*};
 
-pub fn ui_reader(f: &mut Frame, ctx: &Context, app_state: &mut AppState) {
+pub fn ui_reader(f: &mut Frame, app_state: &mut AppState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(1), Constraint::Length(3)])
