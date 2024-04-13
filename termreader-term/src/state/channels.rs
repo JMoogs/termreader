@@ -27,6 +27,7 @@ pub enum BookInfo {
     ID(ID),
 }
 
+#[derive(Clone, Copy)]
 pub enum BookInfoDetails {
     SourceNoOptions,
     SourceWithOptions,

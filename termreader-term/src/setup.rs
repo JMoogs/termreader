@@ -3,14 +3,17 @@ use std::thread;
 use crate::{
     helpers::StatefulList,
     state::{
-        channels::{BookInfo, RequestData},
+        channels::{BookInfo, BookInfoDetails, RequestData},
         sources::SourceNovelPreviewSelection,
         AppState, HistoryScreen, LibScreen, Screen, SourceScreen,
     },
 };
 use ratatui::widgets::ListState;
 use termreader_core::{book::Book, history::HistoryEntry, id::ID, Context};
-use termreader_sources::{novel::Novel, sources::Scrape};
+use termreader_sources::{
+    novel::{Novel, NovelPreview},
+    sources::{Scrape, SortOrder, SourceID},
+};
 use thiserror::Error;
 
 /// This module provides functions that perform the required
@@ -40,6 +43,14 @@ pub enum BookError {
     /// The chapter does not exist
     #[error("the requested chapter is unavailable")]
     UnavailableChapter,
+}
+
+/// An error relating to a source
+#[derive(Error, Debug)]
+pub enum SourceError {
+    /// The source does not exist
+    #[error("the source does not exist")]
+    NonExistent,
 }
 
 /// Enters book selection for a globally sourced book
@@ -129,6 +140,29 @@ pub fn enter_book_view(app_state: &mut AppState, novel: Novel, view: BookViewTyp
             app_state.update_screen(Screen::History(HistoryScreen::BookView))
         }
     }
+}
+
+pub fn search_book_details(
+    app_state: &mut AppState,
+    ctx: &Context,
+    source_id: SourceID,
+    novel: &NovelPreview,
+    view_type: BookInfoDetails,
+) -> Result<(), SourceError> {
+    let url = novel.get_url().to_string();
+    let Some(source) = ctx.source_get_by_id(source_id) else {
+        return Err(SourceError::NonExistent);
+    };
+    let source = source.clone();
+    let tx = app_state.channel.get_sender();
+    app_state.channel.loading = true;
+
+    thread::spawn(move || {
+        let book = source.parse_novel_and_chapters(url);
+        let _ = tx.send(RequestData::BookInfo((book, view_type)));
+    });
+
+    Ok(())
 }
 
 pub fn enter_category_select(app_state: &mut AppState, ctx: &Context) {
@@ -396,4 +430,57 @@ pub fn remove_history_entry(app_state: &mut AppState, ctx: &mut Context, book: I
         // If nothing's selected then we leave it
         None => return,
     }
+}
+
+/// Search a source for a term. If no term is given, search for popular books
+pub fn search_source(
+    app_state: &mut AppState,
+    ctx: &Context,
+    source_id: SourceID,
+    search_term: Option<String>,
+) -> Result<(), SourceError> {
+    let Some(source) = ctx.source_get_by_id(source_id) else {
+        return Err(SourceError::NonExistent);
+    };
+    let source = source.clone();
+    let tx = app_state.channel.get_sender();
+    app_state.channel.loading = true;
+
+    if let Some(term) = search_term {
+        thread::spawn(move || {
+            let res = source.search_novels(&term);
+            let _ = tx.send(RequestData::SearchResults(res));
+        });
+    } else {
+        thread::spawn(move || {
+            let res = source.get_popular(SortOrder::Rating, 1);
+            let _ = tx.send(RequestData::SearchResults(res));
+        });
+    }
+
+    Ok(())
+}
+
+/// Rename a book, setting it's name back to the default if a new name isn't given.
+pub fn rename_book(book: &mut Book, new_name: Option<String>) {
+    if let Some(n) = new_name {
+        book.rename(n)
+    } else {
+        if book.is_local() {
+            todo!()
+        } else {
+            book.rename(book.global_get_novel().get_name().to_string())
+        }
+    }
+}
+
+pub fn add_book_to_lib(app_state: &mut AppState, ctx: &mut Context, novel: Novel) {
+    let book = if let Some(book) = ctx.find_book_by_url(novel.get_full_url().to_string()) {
+        book.clone()
+    } else {
+        Book::from_novel(novel)
+    };
+    ctx.lib_add_book(book, None);
+    // Select this book if there were previously no books selected
+    app_state.lib_data.fix_book_selection_state(ctx);
 }
