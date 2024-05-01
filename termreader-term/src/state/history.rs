@@ -10,6 +10,7 @@ pub struct HistoryData {
     selected_entry: ListState,
     pub local_book_options: StatefulList<String>,
     pub global_book_options: StatefulList<String>,
+    pub view_book_with_opts: bool,
 }
 
 impl HistoryData {
@@ -31,6 +32,7 @@ impl HistoryData {
                 String::from("View book"),
                 String::from("Remove from history"),
             ]),
+            view_book_with_opts: true,
         }
     }
 

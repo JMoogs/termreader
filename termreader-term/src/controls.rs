@@ -60,7 +60,7 @@ pub fn handle_controls(ctx: &mut Context, app_state: &mut AppState, mut key: Key
                 control_search_res(ctx, app_state, key);
             }
             SourceScreen::Select => control_source_select(ctx, app_state, key),
-            SourceScreen::BookView => control_source_book_view(ctx, app_state, key),
+            SourceScreen::BookView => control_book_view_opts(ctx, app_state, key),
         },
         Screen::History(s) => match s {
             HistoryScreen::Main => {
@@ -69,7 +69,13 @@ pub fn handle_controls(ctx: &mut Context, app_state: &mut AppState, mut key: Key
             }
             HistoryScreen::LocalBookOptions => todo!(),
             HistoryScreen::GlobalBookOptions => control_history_global_book(ctx, app_state, key),
-            HistoryScreen::BookView => control_book_view_no_opts(ctx, app_state, key),
+            HistoryScreen::BookView => {
+                if app_state.history_data.view_book_with_opts {
+                    control_book_view_opts(ctx, app_state, key)
+                } else {
+                    control_book_view_no_opts(ctx, app_state, key)
+                }
+            }
         },
         Screen::Settings(s) => match s {
             SettingsScreen::Main => control_main_menu(app_state, key),
@@ -226,6 +232,7 @@ fn control_library_global_book_select(ctx: &mut Context, app_state: &mut AppStat
                         .get_id();
                     ctx.lib_remove_book(book_id);
                     app_state.lib_data.reset_selection(ctx);
+                    app_state.lib_data.global_selected_book_opts.select_first();
                     app_state.update_screen(Screen::Lib(LibScreen::Main))
                 }
                 _ => unreachable!(),
@@ -341,7 +348,7 @@ fn handle_typing(ctx: &mut Context, app_state: &mut AppState, key: KeyCode) {
     }
 }
 
-fn control_source_book_view(ctx: &mut Context, app_state: &mut AppState, key: KeyCode) {
+fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyCode) {
     match key {
         KeyCode::Char(']') | KeyCode::Tab => {
             app_state

@@ -5,6 +5,7 @@ pub mod reader;
 pub mod sources;
 
 use crate::helpers::StatefulList;
+use crate::state::HistoryScreen;
 use crate::state::LibScreen;
 use crate::state::Screen;
 use crate::state::SourceScreen;
@@ -28,10 +29,12 @@ pub fn ui_main(f: &mut Frame, ctx: &mut Context, app_state: &mut AppState) {
         ])
         .split(f.size());
 
+    let in_book_view = app_state.screen == Screen::Sources(SourceScreen::BookView)
+        || app_state.screen == Screen::Lib(LibScreen::BookView)
+        || app_state.screen == Screen::History(HistoryScreen::BookView);
+
     // Render the tabs
-    if !(app_state.screen == Screen::Sources(SourceScreen::BookView)
-        || app_state.screen == Screen::Lib(LibScreen::BookView))
-    {
+    if !in_book_view {
         render_tabs(chunks[0], app_state, f);
     }
 
@@ -46,9 +49,7 @@ pub fn ui_main(f: &mut Frame, ctx: &mut Context, app_state: &mut AppState) {
     }
 
     // Render command bar / controls
-    if !(app_state.screen == Screen::Sources(SourceScreen::BookView)
-        || app_state.screen == Screen::Lib(LibScreen::BookView))
-    {
+    if !in_book_view {
         let text = if app_state.command_bar {
             format!(":{}_", app_state.buffer.text)
         } else {

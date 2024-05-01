@@ -139,12 +139,19 @@ impl GlobalReader {
 
         // If theres no text then you can't scroll
         if current_display.is_empty() {
-            trace_dbg!("Encountered empty line");
             return;
         }
 
-        // The entire first line + 1 to start on the first char of the next line
-        let offset = current_display[0].split_whitespace().count() + 1;
+        // Honestly idk how I cooked this up and why it works but it fixes the issue
+        let offset = if current_display[0].is_empty() {
+            1
+        } else if current_display.get(1).is_some_and(|x| !x.is_empty()) {
+            current_display[0].split_whitespace().count()
+        } else {
+            current_display[0].split_whitespace().count() + 1
+        };
+
+        trace_dbg!(offset);
 
         // Create a possible viable scroll
         let proposed_start = self.state.start_word_idx + offset;

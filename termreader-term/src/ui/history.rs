@@ -50,8 +50,10 @@ pub(super) fn render_history(rect: Rect, ctx: &Context, app_state: &mut AppState
 
         // Only render options if the book isn't in the library
         if ctx.lib_find_book(book_id).is_some() {
+            app_state.history_data.view_book_with_opts = false;
             render_book_view(f, app_state, false)
         } else {
+            app_state.history_data.view_book_with_opts = true;
             render_book_view(f, app_state, true)
         }
     }

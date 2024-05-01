@@ -328,6 +328,7 @@ pub fn continue_book_history(app_state: &mut AppState, ctx: &Context, entry: &Hi
     let tx = app_state.channel.get_sender();
     let novel = book.global_get_novel().clone();
 
+    app_state.channel.loading = true;
     thread::spawn(move || {
         let text = source.parse_chapter(
             novel.get_url().to_string(),
