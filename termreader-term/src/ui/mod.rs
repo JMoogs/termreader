@@ -5,6 +5,7 @@ pub mod reader;
 pub mod sources;
 
 use crate::helpers::StatefulList;
+use crate::state::config::ConfigData;
 use crate::state::HistoryScreen;
 use crate::state::LibScreen;
 use crate::state::Screen;
@@ -15,7 +16,6 @@ use crate::ui::library::render_lib;
 use crate::ui::sources::render_sources;
 use crate::AppState;
 use crate::Context;
-use crate::{SELECTED_STYLE, UNSELECTED_STYLE};
 use ratatui::{prelude::*, widgets::*};
 
 /// Manages rendering for the UI when not in reader mode
@@ -31,6 +31,7 @@ pub fn ui_main(f: &mut Frame, ctx: &mut Context, app_state: &mut AppState) {
 
     let in_book_view = app_state.screen == Screen::Sources(SourceScreen::BookView)
         || app_state.screen == Screen::Lib(LibScreen::BookView)
+        || app_state.screen == Screen::Lib(LibScreen::BookViewCategory)
         || app_state.screen == Screen::History(HistoryScreen::BookView);
 
     // Render the tabs
@@ -49,22 +50,20 @@ pub fn ui_main(f: &mut Frame, ctx: &mut Context, app_state: &mut AppState) {
     }
 
     // Render command bar / controls
-    if !in_book_view {
-        let text = if app_state.command_bar {
-            format!(":{}_", app_state.buffer.text)
-        } else {
-            String::from(
-                "Quit: Esc/q | Scroll tabs: [/] | Scroll categories: {/} | Scroll entries: Up/Down",
-            )
-        };
+    let text = if app_state.command_bar {
+        format!(":{}_", app_state.buffer.text)
+    } else {
+        String::from(
+            "Quit: Esc/q | Scroll tabs: [/] | Scroll categories: {/} | Scroll entries: Up/Down",
+        )
+    };
 
-        let text = Paragraph::new(text).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded),
-        );
-        f.render_widget(text, chunks[2]);
-    }
+    let text = Paragraph::new(text).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded),
+    );
+    f.render_widget(text, chunks[2]);
 }
 
 /// Renders the different tabs
@@ -80,14 +79,15 @@ fn render_tabs(rect: Rect, app_state: &AppState, f: &mut Frame) {
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded),
         )
-        .style(UNSELECTED_STYLE)
-        .highlight_style(SELECTED_STYLE)
+        .style(app_state.config.unselected_style)
+        .highlight_style(app_state.config.selected_style)
         .select(app_state.menu_tabs.selected_idx().unwrap());
 
     f.render_widget(tabs, rect);
 }
 
 fn render_selection_box(
+    config: &ConfigData,
     rect: Rect,
     box_name: String,
     selection: &mut StatefulList<String>,
@@ -109,7 +109,7 @@ fn render_selection_box(
 
     let list: Vec<ListItem> = options
         .into_iter()
-        .map(|i| ListItem::new(i).style(UNSELECTED_STYLE))
+        .map(|i| ListItem::new(i).style(config.unselected_style))
         .collect();
 
     let height = list.len() + 2;
@@ -121,7 +121,7 @@ fn render_selection_box(
                 .title(box_name)
                 .border_type(BorderType::Rounded),
         )
-        .highlight_style(SELECTED_STYLE)
+        .highlight_style(config.selected_style)
         .highlight_symbol("> ");
 
     let r = centered_sized_rect(max_width as u16, height as u16, rect);
@@ -147,6 +147,7 @@ fn render_type_box(rect: Rect, app_state: &mut AppState, f: &mut Frame, title: S
 }
 
 fn render_selection_screen(
+    config: &ConfigData,
     rect: Rect,
     box_name: String,
     selection: &mut StatefulList<String>,
@@ -156,7 +157,7 @@ fn render_selection_screen(
 
     let list: Vec<ListItem> = options
         .into_iter()
-        .map(|i| ListItem::new(i).style(UNSELECTED_STYLE))
+        .map(|i| ListItem::new(i).style(config.unselected_style))
         .collect();
 
     let display = List::new(list)
@@ -166,7 +167,7 @@ fn render_selection_screen(
                 .title(box_name)
                 .border_type(BorderType::Rounded),
         )
-        .highlight_style(SELECTED_STYLE)
+        .highlight_style(config.selected_style)
         .highlight_symbol("> ");
 
     f.render_stateful_widget(display, rect, selection.state_mut())

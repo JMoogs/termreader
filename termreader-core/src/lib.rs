@@ -8,6 +8,7 @@ mod sources;
 
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::path::PathBuf;
 use termreader_sources::sources::{Source, SourceID};
 
 use crate::book::Book;
@@ -23,20 +24,22 @@ pub struct Context {
     library: LibraryContext,
     history: HistoryContext,
     sources: SourceContext,
+    data_path: PathBuf,
 }
 
 impl Context {
-    pub fn build() -> Result<Self> {
+    pub fn build(data_path: PathBuf) -> Result<Self> {
         Ok(Self {
-            library: save::load_library()?,
-            history: save::load_history()?,
+            library: save::load_library(&data_path)?,
+            history: save::load_history(&data_path)?,
             sources: SourceContext::build(),
+            data_path,
         })
     }
 
     pub fn save(self) -> Result<()> {
-        save::store_history(&self.history)?;
-        save::store_library(&self.library)?;
+        save::store_history(&self.history, &self.data_path)?;
+        save::store_library(&self.library, &self.data_path)?;
 
         Ok(())
     }
@@ -84,6 +87,20 @@ impl Context {
     /// the book is moved to the default category
     pub fn lib_move_book_category(&mut self, id: ID, category: Option<&str>) {
         self.library.move_category(id, category);
+    }
+
+    /// Move a category forwards by one in order
+    ///
+    /// Returns the new position of the category, or None if the index was out of bounds.
+    pub fn lib_reorder_category_up(&mut self, category_idx: usize) -> Option<usize> {
+        self.library.reorder_category_up(category_idx)
+    }
+
+    /// Move a category backwards by one in order
+    ///
+    /// Returns the new position of the category, or None if the index was out of bounds.
+    pub fn lib_reorder_category_down(&mut self, category_idx: usize) -> Option<usize> {
+        self.library.reorder_category_down(category_idx)
     }
 
     pub fn lib_create_category(&mut self, name: String) -> Result<(), ()> {

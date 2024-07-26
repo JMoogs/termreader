@@ -7,6 +7,7 @@ use crate::{
         sources::SourceNovelPreviewSelection,
         AppState, HistoryScreen, LibScreen, Screen, SourceScreen,
     },
+    ui::sources::BookViewOption,
 };
 use ratatui::widgets::ListState;
 use termreader_core::{book::Book, history::HistoryEntry, id::ID, Context};
@@ -27,6 +28,8 @@ pub enum EntryError {
     UnsetValue,
     #[error("a book should have been selected in the library but was not")]
     UnselectedLibBook,
+    #[error("the selected book has no chapters")]
+    NoChapters,
     #[error("a category should have been selected but was not")]
     UnselectedCategory,
 }
@@ -70,6 +73,7 @@ pub fn enter_global_book_select(app_state: &mut AppState) -> Result<(), EntryErr
 ///
 /// Errors if:
 /// - A book has not been selected in the library
+/// - A book has no chapters
 pub fn continue_reading_global_select(
     app_state: &mut AppState,
     ctx: &mut Context,
@@ -80,7 +84,10 @@ pub fn continue_reading_global_select(
 
     let id = book.get_id();
     let novel = book.global_get_novel().clone();
-    let ch = book.global_get_next_ordered_chap();
+    let ch = match book.global_get_next_ordered_chap() {
+        Some(c) => c,
+        None => return Err(EntryError::NoChapters),
+    };
 
     let source_id = book.global_get_source_id();
     let source = ctx
@@ -124,14 +131,16 @@ pub fn enter_book_view(app_state: &mut AppState, novel: Novel, view: BookViewTyp
     app_state.buffer.novel = Some(novel);
     match view {
         BookViewType::Source => {
+            app_state.buffer.book_view_option = BookViewOption::SourceOptions;
             app_state.source_data.novel_preview_selected_field =
                 SourceNovelPreviewSelection::Options;
             app_state.source_data.novel_options.select_first();
             app_state.update_screen(Screen::Sources(SourceScreen::BookView))
         }
         BookViewType::Lib => {
+            app_state.buffer.book_view_option = BookViewOption::LibOptions;
             app_state.source_data.novel_preview_selected_field =
-                SourceNovelPreviewSelection::Chapters;
+                SourceNovelPreviewSelection::Options;
             app_state.update_screen(Screen::Lib(LibScreen::BookView))
         }
         BookViewType::History => {
@@ -169,6 +178,12 @@ pub fn enter_category_select(app_state: &mut AppState, ctx: &Context) {
     let cats = ctx.lib_get_categories().clone();
     app_state.buffer.temporary_list = StatefulList::from(cats);
     app_state.update_screen(Screen::Lib(LibScreen::CategorySelect));
+}
+
+pub fn enter_book_opts_categories(app_state: &mut AppState, ctx: &Context) {
+    let cats = ctx.lib_get_categories().clone();
+    app_state.buffer.temporary_list = StatefulList::from(cats);
+    app_state.update_screen(Screen::Lib(LibScreen::BookViewCategory));
 }
 
 pub fn enter_category_options(app_state: &mut AppState) {
@@ -222,6 +237,48 @@ pub fn create_category(
     } else {
         Err(())
     }
+}
+
+pub fn move_category_up(app_state: &mut AppState, ctx: &mut Context) {
+    let cat = app_state
+        .buffer
+        .temporary_list
+        .selected_idx()
+        .expect("a category should always be selected");
+
+    let Some(new_pos) = ctx.lib_reorder_category_up(cat) else {
+        return;
+    };
+
+    // Fix the list to reflect the new state
+    let cats = ctx.lib_get_categories().clone();
+    app_state.buffer.temporary_list = StatefulList::from(cats);
+    app_state
+        .buffer
+        .temporary_list
+        .state_mut()
+        .select(Some(new_pos))
+}
+
+pub fn move_category_down(app_state: &mut AppState, ctx: &mut Context) {
+    let cat = app_state
+        .buffer
+        .temporary_list
+        .selected_idx()
+        .expect("a category should always be selected");
+
+    let Some(new_pos) = ctx.lib_reorder_category_down(cat) else {
+        return;
+    };
+
+    // Fix the list to reflect the new state
+    let cats = ctx.lib_get_categories().clone();
+    app_state.buffer.temporary_list = StatefulList::from(cats);
+    app_state
+        .buffer
+        .temporary_list
+        .state_mut()
+        .select(Some(new_pos))
 }
 
 pub fn rename_category(app_state: &mut AppState, ctx: &mut Context, new_name: String) {
@@ -462,15 +519,18 @@ pub fn search_source(
     Ok(())
 }
 
-/// Rename a book, setting it's name back to the default if a new name isn't given.
-pub fn rename_book(book: &mut Book, new_name: Option<String>) {
+/// Rename a book, setting it's name back to the default if a new name isn't given. Returns the resulting name.
+pub fn rename_book(book: &mut Book, new_name: Option<String>) -> String {
     if let Some(n) = new_name {
-        book.rename(n)
+        book.rename(n.clone());
+        n
     } else {
         if book.is_local() {
             todo!()
         } else {
-            book.rename(book.global_get_novel().get_name().to_string())
+            let n = book.global_get_novel().get_name().to_string();
+            book.rename(n.clone());
+            n
         }
     }
 }

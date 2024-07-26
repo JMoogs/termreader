@@ -1,12 +1,14 @@
 use crate::state::sources::SourceNovelPreviewSelection;
+use crate::state::LibScreen;
 use crate::ui::render_selection_box;
 use crate::ui::render_type_box;
 use crate::AppState;
 use crate::Context;
 use crate::Screen;
 use crate::SourceScreen;
-use crate::{SELECTED_STYLE, UNSELECTED_STYLE};
 use ratatui::{prelude::*, widgets::*};
+
+use super::render_selection_screen;
 
 pub(super) fn render_sources(rect: Rect, ctx: &Context, app_state: &mut AppState, f: &mut Frame) {
     if let Screen::Sources(s) = app_state.screen {
@@ -15,7 +17,7 @@ pub(super) fn render_sources(rect: Rect, ctx: &Context, app_state: &mut AppState
                 let display_data: Vec<ListItem> = ctx
                     .source_get_info()
                     .into_iter()
-                    .map(|(_, name)| ListItem::new(name).style(UNSELECTED_STYLE))
+                    .map(|(_, name)| ListItem::new(name).style(app_state.config.unselected_style))
                     .collect();
 
                 let sources = List::new(display_data)
@@ -25,7 +27,7 @@ pub(super) fn render_sources(rect: Rect, ctx: &Context, app_state: &mut AppState
                             .title("Sources")
                             .border_type(BorderType::Rounded),
                     )
-                    .highlight_style(SELECTED_STYLE)
+                    .highlight_style(app_state.config.selected_style)
                     .highlight_symbol("> ");
                 f.render_stateful_widget(
                     sources,
@@ -39,6 +41,7 @@ pub(super) fn render_sources(rect: Rect, ctx: &Context, app_state: &mut AppState
                     } else {
                         // render_selection_box(rect, app_state, f);
                         render_selection_box(
+                            &app_state.config,
                             rect,
                             String::from("Options"),
                             &mut app_state.source_data.source_options,
@@ -48,7 +51,7 @@ pub(super) fn render_sources(rect: Rect, ctx: &Context, app_state: &mut AppState
                 }
             }
             SourceScreen::SearchRes => render_search_results(rect, app_state, f),
-            SourceScreen::BookView => render_book_view(f, app_state, true),
+            SourceScreen::BookView => render_book_view(f, app_state, BookViewOption::SourceOptions),
         }
     }
 }
@@ -61,7 +64,7 @@ fn render_search_results(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
         .items
         .clone()
         .into_iter()
-        .map(|f| ListItem::new(f.get_name().to_string()).style(UNSELECTED_STYLE))
+        .map(|f| ListItem::new(f.get_name().to_string()).style(app_state.config.unselected_style))
         .collect();
 
     let results = List::new(display)
@@ -71,24 +74,35 @@ fn render_search_results(rect: Rect, app_state: &mut AppState, f: &mut Frame) {
                 .title("Results:")
                 .border_type(BorderType::Rounded),
         )
-        .highlight_style(SELECTED_STYLE)
+        .highlight_style(app_state.config.selected_style)
         .highlight_symbol("> ");
 
     f.render_stateful_widget(results, rect, app_state.buffer.novel_search_res.state_mut());
 }
 
-pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, show_options: bool) {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+pub enum BookViewOption {
+    #[default]
+    None,
+    LibOptions,
+    SourceOptions,
+}
+
+pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, option_type: BookViewOption) {
     // We want to display:
     // 1) The title across the top
     // 2) The synopsis - left
     // 3) Options - middle right (conditional on `show_options`)
+    //   - In certain cases, we may want to replace the options screen with something else
     // 4) The chapter list - bottom right
+    // We also need to display the bar at the bottom
 
     let chunks_vert_1 = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // The title bar
             Constraint::Min(1),    // The rest of the contents
+            Constraint::Length(3), // Left empty for the bottom bar
         ])
         .split(f.size());
 
@@ -112,7 +126,7 @@ pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, show_options: b
     let novel = app_state.buffer.novel.as_ref().unwrap();
 
     // Title
-    let title = Paragraph::new(novel.get_name())
+    let title = Paragraph::new(novel.get_alias_or_name())
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -126,12 +140,12 @@ pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, show_options: b
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .style(UNSELECTED_STYLE);
+        .style(app_state.config.unselected_style);
 
     let block = if app_state.source_data.novel_preview_selected_field
         == SourceNovelPreviewSelection::Summary
     {
-        block.style(SELECTED_STYLE)
+        block.style(app_state.config.selected_style)
     } else {
         block
     };
@@ -144,37 +158,71 @@ pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, show_options: b
     f.render_widget(synopsis, chunks_horiz[0]);
 
     // Options
-    if show_options {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title("Options")
-            .border_type(BorderType::Rounded)
-            .style(UNSELECTED_STYLE);
 
-        let options = app_state.source_data.novel_options.clone();
-        let list: Vec<ListItem> = Vec::from(options)
-            .into_iter()
-            .map(|i| ListItem::new(i).style(UNSELECTED_STYLE))
-            .collect();
+    if option_type != BookViewOption::None {
+        if app_state.typing {
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title("New Name (leave blank to reset):")
+                .border_type(BorderType::Rounded)
+                .style(app_state.config.selected_style); // Always the selected box if typing
 
-        let block = if app_state.source_data.novel_preview_selected_field
-            == SourceNovelPreviewSelection::Options
-        {
-            block.style(SELECTED_STYLE)
+            let mut text = app_state.buffer.text.clone();
+            text.push('_');
+
+            let display = Paragraph::new(text).wrap(Wrap { trim: false }).block(block);
+
+            f.render_widget(display, chunks_vert_2[0]);
+        } else if matches!(app_state.screen, Screen::Lib(LibScreen::BookViewCategory)) {
+            render_selection_screen(
+                &app_state.config,
+                chunks_vert_2[0],
+                String::from("Pick category:"),
+                &mut app_state.buffer.temporary_list,
+                f,
+            );
         } else {
-            block
-        };
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title("Options")
+                .border_type(BorderType::Rounded)
+                .style(app_state.config.unselected_style);
 
-        let display = List::new(list)
-            .block(block)
-            .highlight_style(SELECTED_STYLE)
-            .highlight_symbol("> ");
+            // let options = app_state.source_data.novel_options.clone();
+            let options = match option_type {
+                BookViewOption::LibOptions => app_state.lib_data.global_selected_book_opts.clone(),
+                BookViewOption::SourceOptions => app_state.source_data.novel_options.clone(),
+                _ => unreachable!(),
+            };
 
-        f.render_stateful_widget(
-            display,
-            chunks_vert_2[0],
-            app_state.source_data.novel_options.state_mut(),
-        );
+            let list: Vec<ListItem> = Vec::from(options)
+                .into_iter()
+                .map(|i| ListItem::new(i).style(app_state.config.unselected_style))
+                .collect();
+
+            let block = if app_state.source_data.novel_preview_selected_field
+                == SourceNovelPreviewSelection::Options
+            {
+                block.style(app_state.config.selected_style)
+            } else {
+                block
+            };
+
+            let display = List::new(list)
+                .block(block)
+                .highlight_style(app_state.config.selected_style)
+                .highlight_symbol("> ");
+
+            let state = match option_type {
+                BookViewOption::LibOptions => {
+                    app_state.lib_data.global_selected_book_opts.state_mut()
+                }
+                BookViewOption::SourceOptions => app_state.source_data.novel_options.state_mut(),
+                _ => unreachable!(),
+            };
+
+            f.render_stateful_widget(display, chunks_vert_2[0], state);
+        }
     }
 
     // Chapters
@@ -190,7 +238,7 @@ pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, show_options: b
         .into_iter()
         .map(|i| {
             ListItem::new(format!("{}: {}", i.get_chapter_no(), i.get_name()))
-                .style(UNSELECTED_STYLE)
+                .style(app_state.config.unselected_style)
         })
         .collect();
     let ch_count = list.len();
@@ -203,17 +251,17 @@ pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, show_options: b
     let block = if app_state.source_data.novel_preview_selected_field
         == SourceNovelPreviewSelection::Chapters
     {
-        block.style(SELECTED_STYLE)
+        block.style(app_state.config.selected_style)
     } else {
         block
     };
 
     let display = List::new(list)
         .block(block)
-        .highlight_style(SELECTED_STYLE)
+        .highlight_style(app_state.config.selected_style)
         .highlight_symbol("> ");
 
-    if show_options {
+    if option_type != BookViewOption::None {
         f.render_stateful_widget(
             display,
             chunks_vert_2[1],

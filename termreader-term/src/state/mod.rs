@@ -8,12 +8,14 @@ use termreader_sources::chapter::Chapter;
 
 use self::buffer::Buffer;
 use self::channels::ChannelData;
+use self::config::ConfigData;
 use self::history::HistoryData;
 use self::library::LibData;
 use self::sources::SourceData;
 
 pub mod buffer;
 pub mod channels;
+pub mod config;
 pub mod history;
 pub mod library;
 pub mod reader;
@@ -41,6 +43,8 @@ pub struct AppState {
     pub history_data: HistoryData,
     /// Data from the reader
     pub reader_data: ReaderData,
+    /// Any config data
+    pub config: ConfigData,
     /// A buffer for temporary values
     pub buffer: Buffer,
     /// A boolean representing whether the user is in a command bar or not
@@ -68,6 +72,7 @@ impl AppState {
             source_data: SourceData::build(),
             history_data: HistoryData::build(ctx),
             reader_data: ReaderData::build(),
+            config: ConfigData::build(),
             buffer: Buffer::build(),
             command_bar: false,
             typing: false,
@@ -182,7 +187,10 @@ pub enum LibScreen {
     Main,
     GlobalBookSelect,
     BookView,
+    BookViewCategory,
+    /// A screen where we are seeing a list of categories
     CategorySelect,
+    /// A screen where we are seeing options for categories (creation, deletion, etc.)
     CategoryOptions,
 }
 

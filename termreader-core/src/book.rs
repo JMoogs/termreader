@@ -28,7 +28,11 @@ impl Book {
     }
 
     pub fn rename(&mut self, new_name: String) {
-        self.name = new_name;
+        self.name = new_name.clone();
+        if self.is_global() {
+            let n = self.global_get_novel_mut();
+            n.set_alias(new_name)
+        }
     }
 
     pub fn get_id(&self) -> ID {
@@ -62,6 +66,11 @@ impl Book {
 
     pub fn is_local(&self) -> bool {
         matches!(self.data, BookData::Local(_))
+    }
+
+    /// Returns true if a book is not locally sourced.
+    pub fn is_global(&self) -> bool {
+        matches!(self.data, BookData::Global(_))
     }
 
     pub fn get_current_ch_progress(&self) -> ChapterProgress {
@@ -102,6 +111,13 @@ impl Book {
         match &self.data {
             BookData::Local(_) => panic!("Function called on a book that is not sourced globally"),
             BookData::Global(d) => &d.source_novel,
+        }
+    }
+
+    pub fn global_get_novel_mut(&mut self) -> &mut Novel {
+        match &mut self.data {
+            BookData::Local(_) => panic!("Function called on a book that is not sourced globally"),
+            BookData::Global(d) => &mut d.source_novel,
         }
     }
 
@@ -146,23 +162,25 @@ impl Book {
     /// Get the chapter that should be read for the book to be read in order
     /// the difference between this and `global_get_ordered_chapters` is that
     /// this function will return the next chapter if it exists
-    pub fn global_get_next_ordered_chap(&mut self) -> usize {
+    ///
+    /// Returns `None` if a book has no chapters.
+    pub fn global_get_next_ordered_chap(&mut self) -> Option<usize> {
         match &self.data {
             BookData::Local(_) => panic!("Function called on a book that is not sourced globally"),
             BookData::Global(d) => {
                 let last = d.get_ordered_chapters();
                 if last == 0 && d.total_chapters == 0 {
-                    panic!("No chapters! Unsure what to do")
+                    return None;
                 } else if last == 0 {
-                    return 1;
+                    return Some(1);
                 }
 
                 let is_finished = d.get_chapter_prog(last) == ChapterProgress::Finished;
                 // If the chapter's finished we want to start reading the next one (if it exists)
                 if is_finished && d.total_chapters >= d.get_ordered_chapters() + 1 {
-                    d.get_ordered_chapters() + 1
+                    Some(d.get_ordered_chapters() + 1)
                 } else {
-                    d.get_ordered_chapters()
+                    Some(d.get_ordered_chapters())
                 }
             }
         }

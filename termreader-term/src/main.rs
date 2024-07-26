@@ -21,6 +21,7 @@ use crossterm::{
     execute, terminal,
 };
 use helpers::StatefulList;
+use logging::get_data_dir;
 use ratatui::prelude::*;
 use setup::enter_book_view;
 use setup::BookViewType;
@@ -29,9 +30,6 @@ use state::channels::BookInfoDetails;
 use state::SourceScreen;
 use termreader_core::Context;
 use ui::reader::ui_reader;
-
-pub const UNSELECTED_STYLE: ratatui::style::Style = Style::new().fg(Color::White);
-pub const SELECTED_STYLE: ratatui::style::Style = Style::new().fg(Color::Green);
 
 fn main() -> Result<()> {
     // Start logging
@@ -48,7 +46,8 @@ fn main() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // Load data, run the app, and save data
-    let mut ctx = Context::build()?;
+    let project_dir = get_data_dir();
+    let mut ctx = Context::build(project_dir)?;
     let mut app_state = AppState::build(&ctx);
     let res = run_app(&mut terminal, &mut ctx, &mut app_state);
 

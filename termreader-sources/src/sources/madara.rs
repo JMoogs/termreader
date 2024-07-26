@@ -344,6 +344,7 @@ impl MadaraScraper {
             genres,
             summary,
             chapters: c,
+            alias: None,
         })
     }
 

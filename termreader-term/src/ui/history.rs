@@ -3,11 +3,11 @@ use crate::state::HistoryScreen;
 use crate::state::Screen;
 use crate::AppState;
 use crate::Context;
-use crate::{SELECTED_STYLE, UNSELECTED_STYLE};
 use ratatui::{prelude::*, widgets::*};
 
 use super::render_selection_box;
 use super::sources::render_book_view;
+use super::sources::BookViewOption;
 
 pub(super) fn render_history(rect: Rect, ctx: &Context, app_state: &mut AppState, f: &mut Frame) {
     let Screen::History(historyscreen) = app_state.screen else {
@@ -49,17 +49,19 @@ pub(super) fn render_history(rect: Rect, ctx: &Context, app_state: &mut AppState
             .get_id();
 
         // Only render options if the book isn't in the library
-        if ctx.lib_find_book(book_id).is_some() {
+        // TODO: Change to show options regardless
+        if let Some(_) = ctx.lib_find_book(book_id) {
             app_state.history_data.view_book_with_opts = false;
-            render_book_view(f, app_state, false)
+            render_book_view(f, app_state, BookViewOption::None)
         } else {
             app_state.history_data.view_book_with_opts = true;
-            render_book_view(f, app_state, true)
+            render_book_view(f, app_state, BookViewOption::SourceOptions)
         }
     }
 
     if render_global_options {
         render_selection_box(
+            &app_state.config,
             rect,
             String::from("Options"),
             &mut app_state.history_data.global_book_options,
@@ -69,6 +71,7 @@ pub(super) fn render_history(rect: Rect, ctx: &Context, app_state: &mut AppState
 
     if render_local_options {
         render_selection_box(
+            &app_state.config,
             rect,
             String::from("Options"),
             &mut app_state.history_data.local_book_options,
@@ -98,7 +101,7 @@ pub(super) fn render_history(rect: Rect, ctx: &Context, app_state: &mut AppState
                 )
             };
 
-            vec![ListItem::new(details).style(SELECTED_STYLE)]
+            vec![ListItem::new(details).style(app_state.config.selected_style)]
         } else {
             ctx.hist_get()
                 .clone()
@@ -114,7 +117,7 @@ pub(super) fn render_history(rect: Rect, ctx: &Context, app_state: &mut AppState
                             to_datetime(e.get_timestamp())
                         )
                     };
-                    ListItem::new(t).style(UNSELECTED_STYLE)
+                    ListItem::new(t).style(app_state.config.unselected_style)
                 })
                 .collect()
         };
@@ -131,7 +134,7 @@ pub(super) fn render_history(rect: Rect, ctx: &Context, app_state: &mut AppState
                     .title("History")
                     .border_type(BorderType::Rounded),
             )
-            .highlight_style(SELECTED_STYLE)
+            .highlight_style(app_state.config.selected_style)
             .highlight_symbol("> ");
 
         if render_selected_book {

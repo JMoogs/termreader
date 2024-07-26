@@ -209,4 +209,34 @@ impl LibraryContext {
     pub(super) fn get_category_count(&self) -> usize {
         self.books.len()
     }
+
+    pub(super) fn reorder_category_up(&mut self, move_idx: usize) -> Option<usize> {
+        let cat_count = self.category_order.len();
+        if move_idx >= cat_count {
+            // Index out of bounds
+            return None;
+        } else if move_idx == 0 {
+            // First category so can't move up
+            return Some(0);
+        } else {
+            // Valid to swap upwards
+            self.category_order.swap(move_idx, move_idx - 1);
+            return Some(move_idx - 1);
+        }
+    }
+
+    pub(super) fn reorder_category_down(&mut self, move_idx: usize) -> Option<usize> {
+        let cat_count = self.category_order.len();
+        if move_idx >= cat_count {
+            // Index out of bounds
+            return None;
+        } else if move_idx == cat_count - 1 {
+            // Last category so can't move down
+            return Some(move_idx);
+        } else {
+            // Valid to swap downwards
+            self.category_order.swap(move_idx, move_idx + 1);
+            return Some(move_idx + 1);
+        }
+    }
 }

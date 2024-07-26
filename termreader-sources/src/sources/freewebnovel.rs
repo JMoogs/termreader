@@ -151,6 +151,7 @@ impl Scrape for FreeWebNovelScraper {
             genres,
             summary,
             chapters,
+            alias: None,
         })
     }
 

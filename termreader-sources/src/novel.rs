@@ -45,6 +45,7 @@ pub struct Novel {
     pub(crate) genres: String,
     pub(crate) summary: String,
     pub(crate) chapters: Vec<ChapterPreview>,
+    pub(crate) alias: Option<String>,
 }
 
 impl Novel {
@@ -93,5 +94,16 @@ impl Novel {
 
     pub fn get_full_url(&self) -> &str {
         &self.full_url
+    }
+
+    pub fn get_alias_or_name(&self) -> &str {
+        match &self.alias {
+            Some(a) => &a,
+            None => &self.name,
+        }
+    }
+
+    pub fn set_alias(&mut self, alias: String) {
+        self.alias = Some(alias)
     }
 }
