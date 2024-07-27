@@ -79,10 +79,10 @@ impl Novel {
     }
 
     // TODO: Index it rather than looping through
-    pub fn get_chapter_url(&self, chapter: usize) -> Option<String> {
+    pub fn get_chapter_url(&self, chapter: usize) -> Option<&str> {
         for ch in &self.chapters {
             if ch.chapter_no == chapter {
-                return Some(ch.url.clone());
+                return Some(&ch.url);
             }
         }
         None

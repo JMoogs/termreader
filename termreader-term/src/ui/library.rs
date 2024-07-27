@@ -17,12 +17,9 @@ pub(super) fn render_lib(rect: Rect, ctx: &Context, app_state: &mut AppState, f:
         unreachable!()
     };
 
-    let mut render_global_select = false;
     let mut render_book_v = false;
-    let mut render_typing = false;
     let mut render_categories = false;
     let mut render_books = false;
-    let mut render_selected_book = false;
     let mut render_category_list = false;
     let mut render_category_options = false;
 
@@ -31,36 +28,12 @@ pub(super) fn render_lib(rect: Rect, ctx: &Context, app_state: &mut AppState, f:
             render_books = true;
             render_categories = true;
         }
-        LibScreen::GlobalBookSelect => {
-            if app_state.typing {
-                render_books = true;
-                render_selected_book = true;
-                render_categories = true;
-                render_typing = true;
-            } else {
-                render_books = true;
-                render_selected_book = true;
-                render_categories = true;
-                render_global_select = true;
-            }
-        }
         LibScreen::BookView | LibScreen::BookViewCategory => {
             render_book_v = true;
         }
         LibScreen::CategorySelect => {
             render_categories = true;
-            // Only render books in the rename screen
-            if app_state
-                .prev_screens
-                .last()
-                .expect("it should be impossible to start directly into this screen")
-                == &Screen::Lib(LibScreen::GlobalBookSelect)
-            {
-                render_books = true;
-                render_selected_book = true;
-            } else {
-                render_category_list = true;
-            }
+            render_category_list = true;
         }
         LibScreen::CategoryOptions => {
             render_categories = true;
@@ -80,26 +53,7 @@ pub(super) fn render_lib(rect: Rect, ctx: &Context, app_state: &mut AppState, f:
         .split(rect);
 
     if render_book_v {
-        render_book_view(f, app_state, BookViewOption::LibOptions);
-    }
-
-    if render_typing {
-        render_type_box(
-            chunks[1],
-            app_state,
-            f,
-            "New name (leave blank for original):".into(),
-        )
-    }
-
-    if render_global_select {
-        render_selection_box(
-            &app_state.config,
-            chunks[1],
-            String::from("Options"),
-            &mut app_state.lib_data.global_selected_book_opts,
-            f,
-        );
+        render_book_view(f, app_state, ctx, BookViewOption::LibOptions);
     }
 
     if render_category_list {
@@ -143,21 +97,13 @@ pub(super) fn render_lib(rect: Rect, ctx: &Context, app_state: &mut AppState, f:
         let current_category =
             &ctx.lib_get_categories()[app_state.lib_data.get_selected_category()];
 
-        let mut display_data: Vec<ListItem> = if render_selected_book {
-            let b = app_state
-                .lib_data
-                .get_selected_book(ctx)
-                .expect("no book was selected although one was expected to be");
-
-            vec![ListItem::new(b.display_info()).style(app_state.config.selected_style)]
-        } else {
-            ctx.lib_get_books()
-                .get(current_category)
-                .unwrap()
-                .iter()
-                .map(|b| ListItem::new(b.display_info()).style(app_state.config.unselected_style))
-                .collect()
-        };
+        let mut display_data: Vec<ListItem> = ctx
+            .lib_get_books()
+            .get(current_category)
+            .unwrap()
+            .iter()
+            .map(|b| ListItem::new(b.display_info()).style(app_state.config.unselected_style))
+            .collect();
 
         let book_len = display_data.len();
 
@@ -175,19 +121,11 @@ pub(super) fn render_lib(rect: Rect, ctx: &Context, app_state: &mut AppState, f:
             .highlight_style(app_state.config.selected_style)
             .highlight_symbol("> ");
 
-        if render_selected_book {
-            f.render_stateful_widget(
-                books,
-                chunks[1],
-                &mut ListState::default().with_selected(Some(0)),
-            );
-        } else {
-            f.render_stateful_widget(
-                books,
-                chunks[1],
-                app_state.lib_data.get_selected_book_state_mut(),
-            );
-        }
+        f.render_stateful_widget(
+            books,
+            chunks[1],
+            app_state.lib_data.get_selected_book_state_mut(),
+        );
     }
 
     if render_category_options {

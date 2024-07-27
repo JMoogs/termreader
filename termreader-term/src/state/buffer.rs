@@ -2,20 +2,17 @@
 
 use crate::{helpers::StatefulList, ui::sources::BookViewOption};
 use termreader_core::book::Book;
-use termreader_sources::{
-    chapter::ChapterPreview,
-    novel::{Novel, NovelPreview},
-};
+use termreader_sources::{chapter::ChapterPreview, novel::NovelPreview};
 
 pub struct Buffer {
     /// Text that the user types, for search boxes and similar
     pub text: String,
     /// The results of searching for a novel or viewing popular novels
     pub novel_search_res: StatefulList<NovelPreview>,
-    /// The chapter prewiews of a novel
+    /// The chapter previews of a novel
     pub chapter_previews: StatefulList<ChapterPreview>,
     /// The novel/book currently being viewed
-    pub novel: Option<Novel>,
+    pub novel: Option<Book>,
     /// How far scrolled the novel description is in a preview
     pub novel_preview_scroll: usize,
     /// A book being read directly from the sources page
@@ -47,5 +44,10 @@ impl Buffer {
     /// Clears the entire buffer
     pub fn clear(&mut self) {
         let _ = std::mem::replace(self, Self::build());
+    }
+
+    /// Clears most of the buffer, keeping some parts that may still be relevant
+    pub fn clear_safe(&mut self) {
+        self.reorder_lock = false;
     }
 }

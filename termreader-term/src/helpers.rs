@@ -130,6 +130,11 @@ impl<T> StatefulList<T> {
             self.state.select(Some(0));
         }
     }
+
+    /// Appends an item to the end of the list
+    pub fn push(&mut self, item: T) {
+        self.items.push(item);
+    }
 }
 
 /// Converts a UNIX timestamp into a formatting date/time string.

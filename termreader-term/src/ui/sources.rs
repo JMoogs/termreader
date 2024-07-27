@@ -7,6 +7,7 @@ use crate::Context;
 use crate::Screen;
 use crate::SourceScreen;
 use ratatui::{prelude::*, widgets::*};
+use termreader_core::book::ChapterProgress;
 
 use super::render_selection_screen;
 
@@ -51,7 +52,9 @@ pub(super) fn render_sources(rect: Rect, ctx: &Context, app_state: &mut AppState
                 }
             }
             SourceScreen::SearchRes => render_search_results(rect, app_state, f),
-            SourceScreen::BookView => render_book_view(f, app_state, BookViewOption::SourceOptions),
+            SourceScreen::BookView => {
+                render_book_view(f, app_state, ctx, BookViewOption::SourceOptions)
+            }
         }
     }
 }
@@ -86,9 +89,15 @@ pub enum BookViewOption {
     None,
     LibOptions,
     SourceOptions,
+    HistoryOptions,
 }
 
-pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, option_type: BookViewOption) {
+pub fn render_book_view(
+    f: &mut Frame,
+    app_state: &mut AppState,
+    ctx: &Context,
+    option_type: BookViewOption,
+) {
     // We want to display:
     // 1) The title across the top
     // 2) The synopsis - left
@@ -126,7 +135,7 @@ pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, option_type: Bo
     let novel = app_state.buffer.novel.as_ref().unwrap();
 
     // Title
-    let title = Paragraph::new(novel.get_alias_or_name())
+    let title = Paragraph::new(novel.global_get_novel().get_alias_or_name())
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -150,10 +159,20 @@ pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, option_type: Bo
         block
     };
 
-    let synopsis = Paragraph::new(novel.get_synopsis())
+    let synopsis = Paragraph::new(novel.global_get_novel().get_synopsis())
         .block(block)
-        .wrap(Wrap { trim: true })
-        .scroll((app_state.buffer.novel_preview_scroll as u16, 0));
+        .wrap(Wrap { trim: true });
+
+    // Subtract 2 for borders
+    let para_width = chunks_horiz[0].width - 2;
+    let para_height = chunks_horiz[0].height - 2;
+    let lines = synopsis.line_count(para_width);
+
+    let synopsis = synopsis.scroll((
+        (app_state.buffer.novel_preview_scroll as u16)
+            .min((lines as u16).saturating_sub(para_height)),
+        0,
+    ));
 
     f.render_widget(synopsis, chunks_horiz[0]);
 
@@ -192,6 +211,9 @@ pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, option_type: Bo
             let options = match option_type {
                 BookViewOption::LibOptions => app_state.lib_data.global_selected_book_opts.clone(),
                 BookViewOption::SourceOptions => app_state.source_data.novel_options.clone(),
+                BookViewOption::HistoryOptions => {
+                    app_state.history_data.global_book_options.clone()
+                }
                 _ => unreachable!(),
             };
 
@@ -218,6 +240,9 @@ pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, option_type: Bo
                     app_state.lib_data.global_selected_book_opts.state_mut()
                 }
                 BookViewOption::SourceOptions => app_state.source_data.novel_options.state_mut(),
+                BookViewOption::HistoryOptions => {
+                    app_state.history_data.global_book_options.state_mut()
+                }
                 _ => unreachable!(),
             };
 
@@ -234,13 +259,40 @@ pub fn render_book_view(f: &mut Frame, app_state: &mut AppState, option_type: Bo
         .get_chapters()
         .clone();
 
-    let list: Vec<ListItem> = chapters
-        .into_iter()
-        .map(|i| {
-            ListItem::new(format!("{}: {}", i.get_chapter_no(), i.get_name()))
-                .style(app_state.config.unselected_style)
-        })
-        .collect();
+    // Completed chapters should be displayed in a different style
+    let read_chapters = {
+        if let Some(b) = ctx.find_book_by_url(novel.global_get_novel().get_full_url().to_string()) {
+            b.get_all_ch_progress().clone()
+        } else {
+            std::collections::HashMap::new()
+        }
+    };
+    let mut list: Vec<ListItem> = Vec::with_capacity(chapters.len());
+
+    for ch in chapters.iter() {
+        let num = ch.get_chapter_no();
+        let style = if read_chapters
+            .get(&num)
+            .is_some_and(|progress| progress == &ChapterProgress::Finished)
+        {
+            app_state.config.greyed_style
+        } else {
+            app_state.config.unselected_style
+        };
+
+        let item =
+            ListItem::new(format!("Ch {}: {}", ch.get_chapter_no(), ch.get_name())).style(style);
+
+        list.push(item);
+    }
+
+    // let list: Vec<ListItem> = chapters
+    //     .into_iter()
+    //     .map(|i| {
+    //         ListItem::new(format!("{}: {}", i.get_chapter_no(), i.get_name()))
+    //             .style(app_state.config.unselected_style)
+    //     })
+    //     .collect();
     let ch_count = list.len();
 
     let block = Block::default()

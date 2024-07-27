@@ -1,13 +1,14 @@
 use crossterm::event::KeyCode;
 use termreader_core::Context;
 
+use crate::helpers::StatefulList;
 use crate::setup::{
     add_book_to_lib, continue_book_history, continue_reading_global_select, create_category,
     delete_category, enter_book_opts_categories, enter_book_view, enter_category_options,
     enter_category_select, enter_typing, exit_typing, goto_next_ch, goto_prev_ch,
-    move_book_category, move_category_down, move_category_up, remove_history_entry, rename_book,
-    rename_category, search_book_details, search_source, start_book_from_beginning,
-    start_book_from_ch, BookViewType,
+    move_book_category, move_category_down, move_category_up, rename_book, rename_category,
+    search_book_details, search_source, start_book_from_beginning, start_book_from_ch,
+    BookViewType,
 };
 use crate::state::config::ConfigData;
 use crate::state::{
@@ -44,9 +45,6 @@ pub fn handle_controls(ctx: &mut Context, app_state: &mut AppState, mut key: Key
                 control_main_menu(app_state, key);
                 control_library_menu(ctx, app_state, key);
             }
-            LibScreen::GlobalBookSelect => {
-                control_library_global_book_select(ctx, app_state, key);
-            }
             LibScreen::BookView | LibScreen::BookViewCategory => {
                 control_book_view_opts(ctx, app_state, key)
             }
@@ -72,16 +70,7 @@ pub fn handle_controls(ctx: &mut Context, app_state: &mut AppState, mut key: Key
                 control_main_menu(app_state, key);
                 control_history_menu(ctx, app_state, key);
             }
-            HistoryScreen::LocalBookOptions => todo!(),
-            HistoryScreen::GlobalBookOptions => control_history_global_book(ctx, app_state, key),
-            HistoryScreen::BookView => {
-                if app_state.history_data.view_book_with_opts {
-                    control_book_view_opts(ctx, app_state, key)
-                } else {
-                    // control_book_view_no_opts(ctx, app_state, key)
-                    todo!()
-                }
-            }
+            HistoryScreen::BookView => control_book_view_opts(ctx, app_state, key),
         },
         Screen::Settings(s) => match s {
             SettingsScreen::Main => control_main_menu(app_state, key),
@@ -106,11 +95,12 @@ fn control_library_category_select(ctx: &mut Context, app_state: &mut AppState, 
             app_state.buffer.temporary_list.next();
         }
         KeyCode::Enter => {
-            if app_state
-                .prev_screens
-                .last()
-                .expect("it should be impossible to start directly into this screen")
-                == &Screen::Lib(LibScreen::GlobalBookSelect)
+            if false
+            // app_state
+            //     .prev_screens
+            //     .last()
+            //     .expect("it should be impossible to start directly into this screen")
+            //     == &Screen::Lib(LibScreen::GlobalBookSelect)
             {
                 // We're moving a book to a different category
                 move_book_category(app_state, ctx)
@@ -177,13 +167,6 @@ fn control_library_category_options(ctx: &mut Context, app_state: &mut AppState,
         {
             // Create category
             0 => enter_typing(app_state),
-            // Part 2 of re-ordering
-            // 1 if app_state.buffer.reorder_lock => {
-            //     // TODO: Use custom styles here
-            //     app_state.config.selected_style = ConfigData::DEFAULT_SELECTED_STYLE;
-            //     app_state.buffer.reorder_lock = false;
-            //     app_state.update_screen(Screen::Lib(LibScreen::CategorySelect))
-            // }
             // Re-order categories / Rename categories / Delete categories
             1 | 2 | 3 => enter_category_select(app_state, ctx),
             _ => unreachable!(),
@@ -224,68 +207,12 @@ fn control_library_menu(ctx: &Context, app_state: &mut AppState, key: KeyCode) {
             };
 
             if book.is_global() {
-                let novel = book.global_get_novel();
-                enter_book_view(app_state, novel.clone(), BookViewType::Lib);
+                enter_book_view(app_state, ctx, book.clone(), BookViewType::Lib);
             } else {
                 unimplemented!()
             }
         }
         KeyCode::Char('c') => enter_category_options(app_state),
-        _ => (),
-    }
-}
-
-fn control_library_global_book_select(ctx: &mut Context, app_state: &mut AppState, key: KeyCode) {
-    match key {
-        KeyCode::Up => app_state.lib_data.global_selected_book_opts.previous(),
-        KeyCode::Down => app_state.lib_data.global_selected_book_opts.next(),
-        KeyCode::Enter => {
-            match app_state
-                .lib_data
-                .global_selected_book_opts
-                .selected_idx()
-                .unwrap()
-            {
-                // 0 => Continue reading
-                // 1 => View ch list
-                // 2 => Move to category
-                // 3 => Rename
-                // 4 => Restart
-                // 5 => Remove from lib
-                0 => {
-                    continue_reading_global_select(app_state, ctx).expect("a book has not been selected, even though this menu is only accessible on a selected book");
-                }
-                1 => {
-                    let book = app_state.lib_data
-                        .get_selected_book_mut(ctx)
-                        .expect("a book has not been selected, even though this menu is only accessible on a selected book");
-                    enter_book_view(
-                        app_state,
-                        book.global_get_novel().clone(),
-                        BookViewType::Lib,
-                    )
-                }
-                2 => enter_category_select(app_state, ctx),
-                3 => enter_typing(app_state),
-                4 => {
-                    let book = app_state.lib_data
-                        .get_selected_book_mut(ctx)
-                        .expect("a book has not been selected, even though this menu is only accessible on a selected book");
-                    book.reset_progress();
-                }
-                5 => {
-                    let book_id = app_state.lib_data
-                        .get_selected_book_mut(ctx)
-                        .expect("a book has not been selected, even though this menu is only accessible on a selected book")
-                        .get_id();
-                    ctx.lib_remove_book(book_id);
-                    app_state.lib_data.reset_selection(ctx);
-                    app_state.lib_data.global_selected_book_opts.select_first();
-                    app_state.update_screen(Screen::Lib(LibScreen::Main))
-                }
-                _ => unreachable!(),
-            }
-        }
         _ => (),
     }
 }
@@ -378,6 +305,7 @@ fn handle_typing(ctx: &mut Context, app_state: &mut AppState, key: KeyCode) {
                         .novel
                         .as_mut()
                         .expect("we're in book view so there must be a novel here")
+                        .global_get_novel_mut()
                         .set_alias(new_name);
                 }
                 // Creating a category
@@ -433,10 +361,13 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                     }
                 }
                 BookViewOption::SourceOptions => app_state.source_data.novel_options.previous(),
+                BookViewOption::HistoryOptions => {
+                    app_state.history_data.global_book_options.previous()
+                }
             },
             SourceNovelPreviewSelection::Chapters => app_state.buffer.chapter_previews.previous(),
             SourceNovelPreviewSelection::Summary => {
-                if app_state.buffer.novel_preview_scroll != 0 {
+                if app_state.buffer.novel_preview_scroll > 0 {
                     app_state.buffer.novel_preview_scroll -= 1;
                 }
             }
@@ -453,9 +384,11 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                     }
                 }
                 BookViewOption::SourceOptions => app_state.source_data.novel_options.next(),
+                BookViewOption::HistoryOptions => app_state.history_data.global_book_options.next(),
             },
             SourceNovelPreviewSelection::Chapters => app_state.buffer.chapter_previews.next(),
             SourceNovelPreviewSelection::Summary => {
+                // This is checked when rendering
                 app_state.buffer.novel_preview_scroll += 1;
             }
         },
@@ -480,10 +413,11 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                 .expect("an option should be selected")
                             {
                                 // 0 => Continue reading
-                                // 1 => Move to category
-                                // 2 => Rename
-                                // 3 => Restart
-                                // 4 => Remove from lib
+                                // 1 => Update
+                                // 2 => Move to category
+                                // 3 => Rename
+                                // 4 => Restart
+                                // 5 => Remove from lib
                                 0 => {
                                     match continue_reading_global_select(app_state, ctx) {
                                         Ok(()) => (),
@@ -492,15 +426,34 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                         Err(_) => (),
                                     }
                                 }
-                                1 => enter_book_opts_categories(app_state, ctx),
-                                2 => enter_typing(app_state),
-                                3 => {
+                                1 => {
+                                    // TODO: get rid of this workaround
+                                    let book = app_state
+                                        .lib_data
+                                        .get_selected_book_mut(ctx)
+                                        .expect("a book must be selected to be in this menu");
+
+                                    let source = book.clone().get_source(ctx);
+                                    let book = app_state
+                                        .lib_data
+                                        .get_selected_book_mut(ctx)
+                                        .expect("a book must be selected to be in this menu");
+
+                                    book.update(&source);
+                                    app_state.buffer.novel = Some(book.clone());
+                                    app_state.buffer.chapter_previews = StatefulList::from(
+                                        book.global_get_novel().get_chapters().clone(),
+                                    )
+                                }
+                                2 => enter_book_opts_categories(app_state, ctx),
+                                3 => enter_typing(app_state),
+                                4 => {
                                     let book = app_state.lib_data
                                         .get_selected_book_mut(ctx)
                                         .expect("a book has not been selected, even though this menu is only accessible on a selected book");
                                     book.reset_progress();
                                 }
-                                4 => {
+                                5 => {
                                     let book_id = app_state.lib_data
                                         .get_selected_book_mut(ctx)
                                         .expect("a book has not been selected, even though this menu is only accessible on a selected book")
@@ -532,6 +485,28 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                 _ => unreachable!(),
                             }
                         }
+                        BookViewOption::HistoryOptions => {
+                            match app_state
+                                .history_data
+                                .global_book_options
+                                .selected_idx()
+                                .unwrap()
+                            {
+                                // Continue reading
+                                0 => {
+                                    continue_book_history(
+                                        app_state,
+                                        ctx,
+                                        app_state.history_data.get_selected_book(ctx).unwrap(),
+                                    );
+                                }
+                                // Remove from histroy
+                                1 => {}
+                                // Add/remove from library (depending on whether it is currently in the lib)
+                                2 => {}
+                                _ => unreachable!(),
+                            }
+                        }
                     }
                 }
                 SourceNovelPreviewSelection::Chapters => {
@@ -557,75 +532,8 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
     }
 }
 
-// fn control_book_view_no_opts(ctx: &Context, app_state: &mut AppState, key: KeyCode) {
-//     match key {
-//         KeyCode::Char(']') | KeyCode::Tab => {
-//             match app_state.source_data.novel_preview_selected_field {
-//                 SourceNovelPreviewSelection::Chapters => {
-//                     app_state.source_data.novel_preview_selected_field =
-//                         SourceNovelPreviewSelection::Summary
-//                 }
-//                 SourceNovelPreviewSelection::Summary => {
-//                     app_state.source_data.novel_preview_selected_field =
-//                         SourceNovelPreviewSelection::Chapters
-//                 }
-//                 _ => unreachable!(),
-//             }
-//         }
-//         KeyCode::Char('[') | KeyCode::BackTab => {
-//             match app_state.source_data.novel_preview_selected_field {
-//                 SourceNovelPreviewSelection::Chapters => {
-//                     app_state.source_data.novel_preview_selected_field =
-//                         SourceNovelPreviewSelection::Summary
-//                 }
-//                 SourceNovelPreviewSelection::Summary => {
-//                     app_state.source_data.novel_preview_selected_field =
-//                         SourceNovelPreviewSelection::Chapters
-//                 }
-//                 _ => unreachable!(),
-//             }
-//         }
-//         KeyCode::Up => match app_state.source_data.novel_preview_selected_field {
-//             SourceNovelPreviewSelection::Chapters => app_state.buffer.chapter_previews.previous(),
-//             SourceNovelPreviewSelection::Summary => {
-//                 if app_state.buffer.novel_preview_scroll != 0 {
-//                     app_state.buffer.novel_preview_scroll -= 1;
-//                 }
-//             }
-//             _ => unreachable!(),
-//         },
-//         KeyCode::Down => match app_state.source_data.novel_preview_selected_field {
-//             SourceNovelPreviewSelection::Chapters => app_state.buffer.chapter_previews.next(),
-//             SourceNovelPreviewSelection::Summary => {
-//                 app_state.buffer.novel_preview_scroll += 1;
-//             }
-//             _ => unreachable!(),
-//         },
-//         KeyCode::Enter => match app_state.source_data.novel_preview_selected_field {
-//             SourceNovelPreviewSelection::Chapters => {
-//                 let ch = app_state
-//                     .buffer
-//                     .chapter_previews
-//                     .selected()
-//                     .unwrap()
-//                     .clone();
-//                 let ch_no = ch.get_chapter_no();
-//                 start_book_from_ch(
-//                     app_state,
-//                     ctx,
-//                     app_state.buffer.novel.clone().unwrap(),
-//                     ch_no,
-//                 )
-//                 .expect("chapter should exist");
-//             }
-//             _ => (),
-//         },
-//         _ => (),
-//     }
-// }
-
 fn control_back(app_state: &mut AppState, ctx: &mut Context) {
-    app_state.buffer.clear(); // See if this is valid
+    app_state.buffer.clear_safe();
 
     // Reset styles
     // TODO: Make this work with custom styles when implemented
@@ -673,63 +581,14 @@ fn control_history_menu(ctx: &Context, app_state: &mut AppState, key: KeyCode) {
                 return;
             };
             if entry.get_book().is_local() {
-                app_state.update_screen(Screen::History(HistoryScreen::LocalBookOptions));
+                unimplemented!()
             } else {
-                app_state.update_screen(Screen::History(HistoryScreen::GlobalBookOptions));
-            }
-        }
-        _ => (),
-    }
-}
-
-fn control_history_global_book(ctx: &mut Context, app_state: &mut AppState, key: KeyCode) {
-    match key {
-        KeyCode::Up => app_state.history_data.global_book_options.previous(),
-        KeyCode::Down => app_state.history_data.global_book_options.next(),
-        KeyCode::Enter => {
-            let opt = app_state
-                .history_data
-                .global_book_options
-                .selected_idx()
-                .unwrap();
-
-            let b = app_state
-                .history_data
-                .get_selected_book(ctx)
-                .expect("A book was selected without being selected?");
-
-            let book = b.get_book();
-
-            match opt {
-                0 => {
-                    // Continue reading
-                    continue_book_history(app_state, ctx, b);
-                }
-                1 => {
-                    // View book
-                    // Prefer the library copy in case it's more up to date
-                    // TODO: We should really avoid storing book data twice - look to change it later
-                    let lib_copy = ctx.lib_find_book(book.get_id());
-                    match lib_copy {
-                        Some(lib_book) => {
-                            enter_book_view(
-                                app_state,
-                                lib_book.global_get_novel().clone(),
-                                BookViewType::History,
-                            );
-                        }
-                        None => enter_book_view(
-                            app_state,
-                            book.global_get_novel().clone(),
-                            BookViewType::History,
-                        ),
-                    }
-                }
-                2 => {
-                    remove_history_entry(app_state, ctx, book.get_id());
-                    app_state.update_screen(Screen::History(HistoryScreen::Main));
-                }
-                _ => unreachable!(),
+                enter_book_view(
+                    app_state,
+                    ctx,
+                    entry.get_book().clone(),
+                    BookViewType::History,
+                );
             }
         }
         _ => (),

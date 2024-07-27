@@ -28,6 +28,7 @@ use setup::BookViewType;
 use state::channels::BookInfo;
 use state::channels::BookInfoDetails;
 use state::SourceScreen;
+use termreader_core::book::Book;
 use termreader_core::Context;
 use ui::reader::ui_reader;
 
@@ -94,12 +95,17 @@ fn run_app<B: Backend>(
                     }
                     RequestData::BookInfo((res, info)) => {
                         let novel = res?;
+                        let book = ctx
+                            .find_book_by_url_mut(novel.get_full_url().to_string())
+                            .map(|b| b.clone())
+                            .unwrap_or_else(|| Book::from_novel(novel));
+
                         match info {
                             BookInfoDetails::SourceWithOptions => {
-                                enter_book_view(app_state, novel, BookViewType::Source);
+                                enter_book_view(app_state, ctx, book, BookViewType::Source);
                             }
                             BookInfoDetails::HistoryWithOptions => {
-                                enter_book_view(app_state, novel, BookViewType::History);
+                                enter_book_view(app_state, ctx, book, BookViewType::History);
                             }
                             _ => unreachable!(),
                         }

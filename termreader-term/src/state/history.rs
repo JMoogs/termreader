@@ -10,7 +10,6 @@ pub struct HistoryData {
     selected_entry: ListState,
     pub local_book_options: StatefulList<String>,
     pub global_book_options: StatefulList<String>,
-    pub view_book_with_opts: bool,
 }
 
 impl HistoryData {
@@ -29,11 +28,21 @@ impl HistoryData {
             ]),
             global_book_options: StatefulList::from(vec![
                 String::from("Continue reading"),
-                String::from("View book"),
                 String::from("Remove from history"),
             ]),
-            view_book_with_opts: true,
         }
+    }
+
+    /// Resets options to the default set
+    pub fn reset_options(&mut self) {
+        self.local_book_options = StatefulList::from(vec![
+            String::from("Continue reading"),
+            String::from("Remove from history"),
+        ]);
+        self.global_book_options = StatefulList::from(vec![
+            String::from("Continue reading"),
+            String::from("Remove from history"),
+        ]);
     }
 
     /// Returns a mutable reference to the state representing the selected history entry. This will always succeed. This function should **not** be used directly

@@ -185,7 +185,6 @@ pub enum Screen {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum LibScreen {
     Main,
-    GlobalBookSelect,
     BookView,
     BookViewCategory,
     /// A screen where we are seeing a list of categories
@@ -211,8 +210,8 @@ pub enum SourceScreen {
 pub enum HistoryScreen {
     Main,
     BookView,
-    LocalBookOptions,
-    GlobalBookOptions,
+    // LocalBookOptions,
+    // GlobalBookOptions,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SettingsScreen {

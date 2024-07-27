@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use termreader_sources::{
+    chapter::ChapterPreview,
     novel::Novel,
     sources::{Scrape, Source, SourceID},
 };
@@ -25,6 +26,14 @@ impl PartialEq for Book {
 impl Book {
     pub fn get_name(&self) -> &str {
         &self.name
+    }
+
+    pub fn get_chapters(&self) -> &Vec<ChapterPreview> {
+        if self.is_local() {
+            unimplemented!()
+        } else {
+            self.global_get_novel().get_chapters()
+        }
     }
 
     pub fn rename(&mut self, new_name: String) {
@@ -83,6 +92,14 @@ impl Book {
                     None => ChapterProgress::Location((0, 0)),
                 }
             }
+        }
+    }
+
+    /// Get the progress for all chapters. Panics if called on a locally sourced book
+    pub fn get_all_ch_progress(&self) -> &HashMap<usize, ChapterProgress> {
+        match &self.data {
+            BookData::Local(_) => panic!("Function called on a book that is not sourced globally"),
+            BookData::Global(d) => &d.chapter_progress,
         }
     }
 
@@ -156,6 +173,25 @@ impl Book {
         match &self.data {
             BookData::Local(_) => panic!("Function called on a book that is not sourced globally"),
             BookData::Global(d) => d.get_ordered_chapters(),
+        }
+    }
+
+    /// Get the url of a book, returning none if the book is locally sourced
+    pub fn get_url(&self) -> Option<&str> {
+        if self.is_global() {
+            Some(self.global_get_novel().get_url())
+        } else {
+            None
+        }
+    }
+
+    /// Get the url of a book, returning none if the book is locally sourced,
+    /// or if the chapter does not exist
+    pub fn get_chapter_url(&self, chapter: usize) -> Option<&str> {
+        if self.is_global() {
+            self.global_get_novel().get_chapter_url(chapter)
+        } else {
+            None
         }
     }
 

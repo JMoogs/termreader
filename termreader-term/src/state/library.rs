@@ -37,7 +37,7 @@ impl LibData {
             selected_book,
             global_selected_book_opts: StatefulList::from(vec![
                 String::from("Continue reading"),
-                // String::from("View chapter list"),
+                String::from("Update chapter list"),
                 String::from("Move to category"),
                 String::from("Rename"),
                 String::from("Reset Progress"),
