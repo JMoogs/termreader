@@ -165,4 +165,8 @@ impl Context {
 
         Some(self.history.find_book_mut(id)?)
     }
+
+    pub fn get_save_dir(&self) -> PathBuf {
+        self.data_path.clone()
+    }
 }

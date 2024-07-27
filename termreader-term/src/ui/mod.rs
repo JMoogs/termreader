@@ -121,7 +121,7 @@ fn render_selection_box(
                 .title(box_name)
                 .border_type(BorderType::Rounded),
         )
-        .highlight_style(config.selected_style)
+        .highlight_style(config.get_prompt_style())
         .highlight_symbol("> ");
 
     let r = centered_sized_rect(max_width as u16, height as u16, rect);

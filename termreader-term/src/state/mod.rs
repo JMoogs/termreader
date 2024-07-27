@@ -72,7 +72,7 @@ impl AppState {
             source_data: SourceData::build(),
             history_data: HistoryData::build(ctx),
             reader_data: ReaderData::build(),
-            config: ConfigData::build(),
+            config: ConfigData::load(&ctx.get_save_dir()).unwrap_or_default(),
             buffer: Buffer::build(),
             command_bar: false,
             typing: false,

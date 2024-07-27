@@ -16,7 +16,7 @@ pub enum RequestData {
     SearchResults(Result<Vec<NovelPreview>>),
     /// Info about a novel.
     BookInfo((Result<Novel>, BookInfoDetails)),
-    /// A chapter and it's number (TODO: Add chapter number details to chapters if possible)
+    /// A chapter and it's number
     Chapter((BookInfo, Result<Chapter>, usize)),
     // /// Update info for a book
     // Updated(Book),

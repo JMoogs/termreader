@@ -6,11 +6,10 @@ use crate::setup::{
     add_book_to_lib, continue_book_history, continue_reading_global_select, create_category,
     delete_category, enter_book_opts_categories, enter_book_view, enter_category_options,
     enter_category_select, enter_typing, exit_typing, goto_next_ch, goto_prev_ch,
-    move_book_category, move_category_down, move_category_up, rename_book, rename_category,
-    search_book_details, search_source, start_book_from_beginning, start_book_from_ch,
-    BookViewType,
+    move_book_category, move_category_down, move_category_up, remove_history_entry, rename_book,
+    rename_category, search_book_details, search_source, start_book_from_beginning,
+    start_book_from_ch, BookViewType,
 };
-use crate::state::config::ConfigData;
 use crate::state::{
     channels::BookInfoDetails, sources::SourceNovelPreviewSelection, AppState, HistoryScreen,
     LibScreen, Screen, SettingsScreen, SourceScreen, UpdateScreen,
@@ -95,55 +94,47 @@ fn control_library_category_select(ctx: &mut Context, app_state: &mut AppState, 
             app_state.buffer.temporary_list.next();
         }
         KeyCode::Enter => {
-            if false
-            // app_state
-            //     .prev_screens
-            //     .last()
-            //     .expect("it should be impossible to start directly into this screen")
-            //     == &Screen::Lib(LibScreen::GlobalBookSelect)
+            // We're managing categories
+            match app_state
+                .lib_data
+                .category_options
+                .selected_idx()
+                .expect("an option should always be seleceted")
             {
-                // We're moving a book to a different category
-                move_book_category(app_state, ctx)
-                    .expect("a book or category was not selected when it should have been")
-            } else {
-                // We're managing categories
-                match app_state
-                    .lib_data
-                    .category_options
-                    .selected_idx()
-                    .expect("an option should always be seleceted")
-                {
-                    0 => unreachable!(),
-                    1 => {
-                        // TODO: Use custom styles here
-                        app_state.buffer.reorder_lock = !app_state.buffer.reorder_lock;
-                        if app_state.config.selected_style == ConfigData::DEFAULT_SELECTED_STYLE {
-                            app_state.config.selected_style = ConfigData::DEFAULT_SELECTED_STYLE_2;
-                        } else {
-                            app_state.config.selected_style = ConfigData::DEFAULT_SELECTED_STYLE;
-                        }
+                0 => unreachable!(),
+                1 => {
+                    app_state.buffer.reorder_lock = !app_state.buffer.reorder_lock;
+                    // If the style is changed
+                    if app_state
+                        .config
+                        .prompt_style
+                        .is_some_and(|s| s != app_state.config.selected_style)
+                    {
+                        app_state.config.prompt_style = Some(app_state.config.selected_style);
+                    } else {
+                        app_state.config.prompt_style = Some(app_state.config.selected_style_2)
                     }
-                    // Rename
-                    2 => enter_typing(app_state),
-                    // Delete
-                    3 => {
-                        let deleted = delete_category(
-                            app_state,
-                            ctx,
-                            app_state
-                                .buffer
-                                .temporary_list
-                                .selected()
-                                .expect("a category should always be selected")
-                                .to_string(),
-                        );
-                        // Do nothing if the category wasn't deleted, but if it was, go back
-                        if deleted.is_ok() {
-                            app_state.update_screen(Screen::Lib(LibScreen::Main))
-                        }
-                    }
-                    _ => unreachable!(),
                 }
+                // Rename
+                2 => enter_typing(app_state),
+                // Delete
+                3 => {
+                    let deleted = delete_category(
+                        app_state,
+                        ctx,
+                        app_state
+                            .buffer
+                            .temporary_list
+                            .selected()
+                            .expect("a category should always be selected")
+                            .to_string(),
+                    );
+                    // Do nothing if the category wasn't deleted, but if it was, go back
+                    if deleted.is_ok() {
+                        app_state.update_screen(Screen::Lib(LibScreen::Main))
+                    }
+                }
+                _ => unreachable!(),
             }
         }
 
@@ -199,7 +190,6 @@ fn control_library_menu(ctx: &Context, app_state: &mut AppState, key: KeyCode) {
         KeyCode::Up => app_state.lib_data.select_prev_book(ctx),
         KeyCode::Down => app_state.lib_data.select_next_book(ctx),
         KeyCode::Enter => {
-            // let _ = enter_global_book_select(app_state);
             let b = app_state.lib_data.get_selected_book(ctx);
             // If there's no book selected do nothing
             let Some(book) = b else {
@@ -233,10 +223,10 @@ fn control_source_select(ctx: &Context, app_state: &mut AppState, key: KeyCode) 
         KeyCode::Up => app_state.source_data.source_options.previous(),
         KeyCode::Down => app_state.source_data.source_options.next(),
         KeyCode::Enter => {
-            // 0: Search
-            // 1: View popular
             match app_state.source_data.source_options.selected_idx().unwrap() {
+                // 0: Search
                 0 => enter_typing(app_state),
+                // 1: View popular
                 1 => {
                     search_source(
                         app_state,
@@ -373,7 +363,6 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
             }
         },
         KeyCode::Down => match app_state.source_data.novel_preview_selected_field {
-            // SourceNovelPreviewSelection::Options => app_state.source_data.novel_options.next(),
             SourceNovelPreviewSelection::Options => match app_state.buffer.book_view_option {
                 BookViewOption::None => unreachable!(),
                 BookViewOption::LibOptions => {
@@ -501,9 +490,30 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                     );
                                 }
                                 // Remove from histroy
-                                1 => {}
+                                1 => {
+                                    let book = app_state
+                                        .history_data
+                                        .get_selected_book(&ctx)
+                                        .expect("a book should be selected here")
+                                        .get_book()
+                                        .get_id();
+                                    remove_history_entry(app_state, ctx, book)
+                                }
                                 // Add/remove from library (depending on whether it is currently in the lib)
-                                2 => {}
+                                2 => {
+                                    let book = app_state
+                                        .history_data
+                                        .get_selected_book(&ctx)
+                                        .expect("a book should be selected here")
+                                        .get_book()
+                                        .clone();
+
+                                    if ctx.lib_find_book(book.get_id()).is_some() {
+                                        ctx.lib_remove_book(book.get_id())
+                                    } else {
+                                        ctx.lib_add_book(book, None)
+                                    }
+                                }
                                 _ => unreachable!(),
                             }
                         }
@@ -536,9 +546,7 @@ fn control_back(app_state: &mut AppState, ctx: &mut Context) {
     app_state.buffer.clear_safe();
 
     // Reset styles
-    // TODO: Make this work with custom styles when implemented
-    app_state.config.selected_style = ConfigData::DEFAULT_SELECTED_STYLE;
-    app_state.config.unselected_style = ConfigData::DEFAULT_UNSELECTED_STYLE;
+    app_state.config.reset_styles();
 
     if app_state.screen == Screen::Reader {
         app_state.update_from_reader(ctx);

@@ -1,6 +1,4 @@
 // #![allow(dead_code, unused_imports, unused_variables)]
-
-pub mod appstate;
 pub mod controls;
 pub mod helpers;
 pub mod logging;
@@ -52,6 +50,7 @@ fn main() -> Result<()> {
     let mut app_state = AppState::build(&ctx);
     let res = run_app(&mut terminal, &mut ctx, &mut app_state);
 
+    app_state.config.save(&ctx.get_save_dir())?;
     ctx.save()?;
 
     // Restore the terminal to its initial state
@@ -89,7 +88,6 @@ fn run_app<B: Backend>(
             if let Ok(data) = app_state.channel.reciever.recv() {
                 match data {
                     RequestData::SearchResults(res) => {
-                        // app_state.buffer.clear();
                         app_state.buffer.novel_search_res = StatefulList::from(res?);
                         app_state.update_screen(Screen::Sources(SourceScreen::SearchRes));
                     }
