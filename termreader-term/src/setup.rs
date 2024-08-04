@@ -121,6 +121,23 @@ pub fn enter_book_view(app_state: &mut AppState, ctx: &Context, book: Book, view
             app_state.source_data.novel_preview_selected_field =
                 SourceNovelPreviewSelection::Options;
             app_state.source_data.novel_options.select_first();
+
+            app_state.source_data.reset_novel_options();
+
+            // Swap to removing
+            if ctx.lib_in_lib_url(
+                app_state
+                    .buffer
+                    .novel
+                    .as_ref()
+                    .expect("we just added the book to the buffer")
+                    .get_full_url()
+                    .unwrap()
+                    .to_string(),
+            ) {
+                app_state.source_data.swap_library_options()
+            }
+
             app_state.update_screen(Screen::Sources(SourceScreen::BookView))
         }
         BookViewType::Lib => {
@@ -232,6 +249,13 @@ pub fn delete_category(
     category_name: String,
 ) -> Result<(), ()> {
     if ctx.lib_delete_category(category_name).is_ok() {
+        // If we deleted the last category, and it's currently selected,
+        // We subtract one
+        if ctx.lib_get_categories().len() == app_state.lib_data.get_selected_category() {
+            app_state.lib_data.current_category_idx =
+                app_state.lib_data.current_category_idx.saturating_sub(1);
+        }
+
         let cats = ctx.lib_get_categories().clone();
         app_state.buffer.temporary_list = StatefulList::from(cats);
         Ok(())

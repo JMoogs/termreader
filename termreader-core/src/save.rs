@@ -1,4 +1,4 @@
-use crate::{HistoryContext, LibraryContext};
+use crate::{updates::UpdatesContext, HistoryContext, LibraryContext};
 use anyhow::Result;
 use std::{fs, path::PathBuf};
 
@@ -35,5 +35,23 @@ pub(super) fn load_history(path: &PathBuf) -> Result<HistoryContext> {
         Ok(serde_json::from_str(&data)?)
     } else {
         Ok(HistoryContext::new())
+    }
+}
+
+pub(super) fn store_updates(updates: &UpdatesContext, path: &PathBuf) -> Result<()> {
+    let json = if cfg!(debug_assertations) {
+        serde_json::to_string_pretty(updates)?
+    } else {
+        serde_json::to_string(updates)?
+    };
+    fs::write(path.join("updates.json"), json)?;
+    Ok(())
+}
+
+pub(super) fn load_updates(path: &PathBuf) -> Result<UpdatesContext> {
+    if let Ok(data) = fs::read_to_string(path.join("updates.json")) {
+        Ok(serde_json::from_str(&data)?)
+    } else {
+        Ok(UpdatesContext::new())
     }
 }

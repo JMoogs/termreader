@@ -5,17 +5,20 @@ pub mod id;
 mod library;
 mod save;
 mod sources;
+mod updates;
 
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use termreader_sources::sources::{Source, SourceID};
+use updates::UpdatesEntry;
 
 use crate::book::Book;
 use crate::history::HistoryContext;
 use crate::id::ID;
 use crate::library::LibraryContext;
 use crate::sources::SourceContext;
+use crate::updates::UpdatesContext;
 use anyhow::Result;
 use history::HistoryEntry;
 
@@ -24,6 +27,7 @@ pub struct Context {
     library: LibraryContext,
     history: HistoryContext,
     sources: SourceContext,
+    updates: UpdatesContext,
     data_path: PathBuf,
 }
 
@@ -33,6 +37,7 @@ impl Context {
             library: save::load_library(&data_path)?,
             history: save::load_history(&data_path)?,
             sources: SourceContext::build(),
+            updates: save::load_updates(&data_path)?,
             data_path,
         })
     }
@@ -40,6 +45,7 @@ impl Context {
     pub fn save(self) -> Result<()> {
         save::store_history(&self.history, &self.data_path)?;
         save::store_library(&self.library, &self.data_path)?;
+        save::store_updates(&self.updates, &self.data_path)?;
 
         Ok(())
     }
@@ -128,6 +134,14 @@ impl Context {
         self.library.get_books_mut()
     }
 
+    pub fn lib_find_by_url(&self, url: String) -> Option<&Book> {
+        self.library.find_book_from_url(url)
+    }
+
+    pub fn lib_in_lib_url(&self, url: String) -> bool {
+        self.library.find_book_from_url(url).is_some()
+    }
+
     pub fn source_get_by_id(&self, id: SourceID) -> Option<&Source> {
         self.sources.get_source_by_id(id)
     }
@@ -168,5 +182,21 @@ impl Context {
 
     pub fn get_save_dir(&self) -> PathBuf {
         self.data_path.clone()
+    }
+
+    pub fn updates_clear(&mut self) {
+        self.updates.clear();
+    }
+
+    pub fn updates_remove_book(&mut self, book_id: ID) {
+        self.updates.remove_book(book_id)
+    }
+
+    pub fn updates_get(&self) -> &Vec<UpdatesEntry> {
+        self.updates.get_updates()
+    }
+
+    pub fn updates_get_len(&self) -> usize {
+        self.updates.get_len()
     }
 }

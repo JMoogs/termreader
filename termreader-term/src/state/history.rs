@@ -29,6 +29,7 @@ impl HistoryData {
             global_book_options: StatefulList::from(vec![
                 String::from("Continue reading"),
                 String::from("Remove from history"),
+                String::from("Open in browser"),
             ]),
         }
     }
@@ -42,7 +43,22 @@ impl HistoryData {
         self.global_book_options = StatefulList::from(vec![
             String::from("Continue reading"),
             String::from("Remove from history"),
+            String::from("Open in browser"),
         ]);
+    }
+
+    /// Swap between adding/removing a book to/from the library
+    pub fn swap_library_options(&mut self) {
+        let it = self.global_book_options.items.iter_mut();
+        for elem in it {
+            if elem == &String::from("Add to library") {
+                let _ = std::mem::replace(elem, String::from("Remove from library"));
+            } else if elem == &String::from("Remove from library") {
+                let _ = std::mem::replace(elem, String::from("Add to library"));
+            } else {
+                continue;
+            }
+        }
     }
 
     /// Returns a mutable reference to the state representing the selected history entry. This will always succeed. This function should **not** be used directly

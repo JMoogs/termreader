@@ -185,6 +185,15 @@ impl Book {
         }
     }
 
+    /// Get the full url of a book, returning none if the book is locally sourced
+    pub fn get_full_url(&self) -> Option<&str> {
+        if self.is_global() {
+            Some(self.global_get_novel().get_full_url())
+        } else {
+            None
+        }
+    }
+
     /// Get the url of a book, returning none if the book is locally sourced,
     /// or if the chapter does not exist
     pub fn get_chapter_url(&self, chapter: usize) -> Option<&str> {

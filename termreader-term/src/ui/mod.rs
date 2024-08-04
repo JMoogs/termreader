@@ -3,6 +3,7 @@ pub mod history;
 pub mod library;
 pub mod reader;
 pub mod sources;
+pub mod updates;
 
 use crate::helpers::StatefulList;
 use crate::state::config::ConfigData;
@@ -17,6 +18,8 @@ use crate::ui::sources::render_sources;
 use crate::AppState;
 use crate::Context;
 use ratatui::{prelude::*, widgets::*};
+
+use self::updates::render_updates;
 
 /// Manages rendering for the UI when not in reader mode
 pub fn ui_main(f: &mut Frame, ctx: &mut Context, app_state: &mut AppState) {
@@ -44,6 +47,7 @@ pub fn ui_main(f: &mut Frame, ctx: &mut Context, app_state: &mut AppState) {
         "Library" => render_lib(chunks[1], ctx, app_state, f),
         "Sources" => render_sources(chunks[1], ctx, app_state, f),
         "History" => render_history(chunks[1], ctx, app_state, f),
+        "Updates" => render_updates(chunks[1], ctx, app_state, f),
         // TODO: Render other tabs
         // _ => unreachable!(),
         _ => (),

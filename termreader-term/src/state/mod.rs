@@ -1,5 +1,6 @@
 use crate::helpers::StatefulList;
 use crate::state::reader::ReaderData;
+use crate::state::updates::UpdatesData;
 use crate::trace_dbg;
 use std::time::SystemTime;
 use termreader_core::book::Book;
@@ -20,6 +21,7 @@ pub mod history;
 pub mod library;
 pub mod reader;
 pub mod sources;
+pub mod updates;
 
 /// The state of the TUI.
 /// Contains all data required to run the TUI.
@@ -41,6 +43,8 @@ pub struct AppState {
     pub source_data: SourceData,
     /// Data related to the history tab
     pub history_data: HistoryData,
+    /// Data related to the updates tab
+    pub updates_data: UpdatesData,
     /// Data from the reader
     pub reader_data: ReaderData,
     /// Any config data
@@ -71,6 +75,7 @@ impl AppState {
             lib_data: LibData::build(ctx),
             source_data: SourceData::build(),
             history_data: HistoryData::build(ctx),
+            updates_data: UpdatesData::build(ctx),
             reader_data: ReaderData::build(),
             config: ConfigData::load(&ctx.get_save_dir()).unwrap_or_default(),
             buffer: Buffer::build(),

@@ -8,7 +8,7 @@ use crate::{helpers::StatefulList, trace_dbg};
 /// Data related to the library tab
 pub struct LibData {
     /// The index of the currently selected category
-    current_category_idx: usize,
+    pub current_category_idx: usize,
     /// The currently selected book. Resets upon swapping categories.
     selected_book: ListState,
     /// Options for a selected global book
@@ -42,6 +42,7 @@ impl LibData {
                 String::from("Rename"),
                 String::from("Reset Progress"),
                 String::from("Remove book from library"),
+                String::from("Open in browser"),
             ]),
             category_options: StatefulList::from(vec![
                 String::from("Create categories"),

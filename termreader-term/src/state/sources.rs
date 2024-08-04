@@ -38,7 +38,9 @@ impl SourceNovelPreviewSelection {
 
     pub fn prev_opts(&mut self) {
         *self = match self {
-            SourceNovelPreviewSelection::Summary => SourceNovelPreviewSelection::Chapters, SourceNovelPreviewSelection::Chapters => SourceNovelPreviewSelection::Options, SourceNovelPreviewSelection::Options => SourceNovelPreviewSelection::Summary,
+            SourceNovelPreviewSelection::Summary => SourceNovelPreviewSelection::Chapters,
+            SourceNovelPreviewSelection::Chapters => SourceNovelPreviewSelection::Options,
+            SourceNovelPreviewSelection::Options => SourceNovelPreviewSelection::Summary,
         }
     }
 
@@ -67,8 +69,31 @@ impl SourceData {
             novel_options: StatefulList::from(vec![
                 String::from("Start from beginning"),
                 String::from("Add to library"),
+                String::from("Open in browser"),
             ]),
             novel_preview_selected_field: SourceNovelPreviewSelection::Chapters,
+        }
+    }
+
+    pub fn reset_novel_options(&mut self) {
+        self.novel_options = StatefulList::from(vec![
+            String::from("Start from beginning"),
+            String::from("Add to library"),
+            String::from("Open in browser"),
+        ]);
+    }
+
+    /// Swap between adding/removing a book to/from the library
+    pub fn swap_library_options(&mut self) {
+        let it = self.novel_options.items.iter_mut();
+        for elem in it {
+            if elem == &String::from("Add to library") {
+                let _ = std::mem::replace(elem, String::from("Remove from library"));
+            } else if elem == &String::from("Remove from library") {
+                let _ = std::mem::replace(elem, String::from("Add to library"));
+            } else {
+                continue;
+            }
         }
     }
 

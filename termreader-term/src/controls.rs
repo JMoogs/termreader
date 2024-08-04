@@ -15,6 +15,7 @@ use crate::state::{
     LibScreen, Screen, SettingsScreen, SourceScreen, UpdateScreen,
 };
 use crate::ui::sources::BookViewOption;
+use open;
 
 pub fn handle_controls(ctx: &mut Context, app_state: &mut AppState, mut key: KeyCode) {
     // Handle typing seperately to other controls
@@ -407,6 +408,7 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                 // 3 => Rename
                                 // 4 => Restart
                                 // 5 => Remove from lib
+                                // 6 => Open in browser
                                 0 => {
                                     match continue_reading_global_select(app_state, ctx) {
                                         Ok(()) => (),
@@ -452,6 +454,11 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                     app_state.lib_data.global_selected_book_opts.select_first();
                                     app_state.update_screen(Screen::Lib(LibScreen::Main))
                                 }
+                                6 => {
+                                    let book = app_state.lib_data.get_selected_book(ctx).expect("a book has not been selected, even though this menu is only accessible on a selected book");
+                                    let link = book.get_full_url().unwrap();
+                                    open::that_detached(link).unwrap();
+                                }
                                 _ => unreachable!(),
                             };
                         }
@@ -465,11 +472,25 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                     app_state.buffer.novel.clone().unwrap(),
                                 )
                                 .expect("the book in the buffer should be valid"),
-                                // Add to lib
+                                // Add/remove to/from lib
                                 1 => {
                                     let novel = app_state.buffer.novel.clone().unwrap();
-                                    add_book_to_lib(app_state, ctx, novel);
-                                    app_state.screen = app_state.prev_screens.pop().unwrap();
+
+                                    if ctx.lib_in_lib_url(novel.get_full_url().unwrap().to_string())
+                                    {
+                                        add_book_to_lib(app_state, ctx, novel);
+                                        // TODO: maybe remove this?
+                                        app_state.screen = app_state.prev_screens.pop().unwrap();
+                                    } else {
+                                        ctx.lib_remove_book(novel.get_id())
+                                    }
+                                    app_state.source_data.swap_library_options();
+                                }
+                                // Open in browser
+                                2 => {
+                                    let book = app_state.buffer.novel.as_ref().unwrap();
+                                    let link = book.get_full_url().unwrap();
+                                    open::that_detached(link).unwrap();
                                 }
                                 _ => unreachable!(),
                             }
@@ -497,10 +518,22 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                         .expect("a book should be selected here")
                                         .get_book()
                                         .get_id();
-                                    remove_history_entry(app_state, ctx, book)
+                                    remove_history_entry(app_state, ctx, book);
+                                    // Here it makes sense to return to the history screen
+                                    app_state.update_screen(Screen::History(HistoryScreen::Main));
+                                }
+                                // Open in browser
+                                2 => {
+                                    let book = app_state
+                                        .history_data
+                                        .get_selected_book(&ctx)
+                                        .expect("a book should be selected here")
+                                        .get_book();
+                                    let link = book.get_full_url().unwrap();
+                                    open::that_detached(link).unwrap();
                                 }
                                 // Add/remove from library (depending on whether it is currently in the lib)
-                                2 => {
+                                3 => {
                                     let book = app_state
                                         .history_data
                                         .get_selected_book(&ctx)
@@ -513,6 +546,7 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                     } else {
                                         ctx.lib_add_book(book, None)
                                     }
+                                    app_state.history_data.swap_library_options();
                                 }
                                 _ => unreachable!(),
                             }
