@@ -1,12 +1,12 @@
 // This module contains data relating to when the user is reading a book
-use termreader_core::book::{Book, ChapterProgress};
+use termreader_core::book::{BookRef, ChapterProgress};
 use termreader_sources::chapter::Chapter;
 
 use crate::reader::{GlobalReader, GlobalReaderContents, GlobalReaderState};
 
 /// Data related to what's being read
 pub struct ReaderData {
-    book: Option<Book>,
+    book: Option<BookRef>,
     chapter: Option<Chapter>,
     data: Option<GlobalReader>,
     // Set by the renderer as required
@@ -25,7 +25,7 @@ impl ReaderData {
         }
     }
 
-    pub(super) fn set_data(&mut self, book: Book, chapter: Option<Chapter>) {
+    pub(super) fn set_data(&mut self, book: BookRef, chapter: Option<Chapter>) {
         if chapter.is_none() {
             unimplemented!()
         };
@@ -55,12 +55,9 @@ impl ReaderData {
         Some(d)
     }
 
-    pub fn get_book(&self) -> &Option<Book> {
-        &self.book
-    }
-
-    pub fn get_book_mut(&mut self) -> &mut Option<Book> {
-        &mut self.book
+    pub fn get_book(&self) -> Option<BookRef> {
+        let r = self.book.clone()?;
+        Some(r)
     }
 
     pub fn get_chapter(&self) -> &Option<Chapter> {

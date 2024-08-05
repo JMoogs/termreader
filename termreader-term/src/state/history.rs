@@ -15,7 +15,7 @@ pub struct HistoryData {
 impl HistoryData {
     /// Creates an instance of HistoryData
     pub fn build(ctx: &Context) -> Self {
-        let selected_entry = if ctx.hist_get_len() == 0 {
+        let selected_entry = if ctx.get_history_entry_count() == 0 {
             ListState::default()
         } else {
             ListState::default().with_selected(Some(0))
@@ -68,22 +68,22 @@ impl HistoryData {
 
     /// Returns a reference to the entry that's selected
     pub fn get_selected_book<'a>(&self, ctx: &'a Context) -> Option<&'a HistoryEntry> {
-        let hist = ctx.hist_get();
+        let hist = ctx.get_history();
         Some(&hist[self.selected_entry.selected()?])
     }
 
     pub fn select_next_entry(&mut self, ctx: &Context) {
-        if ctx.hist_get_len() == 0 {
+        if ctx.get_history_entry_count() == 0 {
             self.selected_entry.select(None);
             return;
         }
         match self.selected_entry.selected() {
             Some(s) => {
                 self.selected_entry
-                    .select(Some((s + 1) % ctx.hist_get_len()));
+                    .select(Some((s + 1) % ctx.get_history_entry_count()));
             }
             None => {
-                if ctx.hist_get_len() != 0 {
+                if ctx.get_history_entry_count() != 0 {
                     self.selected_entry.select(Some(0));
                 }
             }
@@ -94,15 +94,16 @@ impl HistoryData {
         match self.selected_entry.selected() {
             Some(s) => {
                 if s == 0 {
-                    if ctx.hist_get_len() != 0 {
-                        self.selected_entry.select(Some(ctx.hist_get_len() - 1));
+                    if ctx.get_history_entry_count() != 0 {
+                        self.selected_entry
+                            .select(Some(ctx.get_history_entry_count() - 1));
                     }
                 } else {
                     self.selected_entry.select(Some(s - 1));
                 }
             }
             None => {
-                let len = ctx.hist_get_len();
+                let len = ctx.get_history_entry_count();
                 if len != 0 {
                     self.selected_entry.select(Some(len - 1));
                 }

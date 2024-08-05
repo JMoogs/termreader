@@ -1,9 +1,9 @@
 // This module contains data related to the library tab of the TUI.
 
 use ratatui::widgets::ListState;
-use termreader_core::{book::Book, Context};
+use termreader_core::{book::BookRef, Context};
 
-use crate::{helpers::StatefulList, trace_dbg};
+use crate::helpers::StatefulList;
 
 /// Data related to the library tab
 pub struct LibData {
@@ -20,9 +20,9 @@ pub struct LibData {
 impl LibData {
     /// Creates an instance of LibData
     pub(super) fn build(ctx: &Context) -> Self {
-        let cat_name = &ctx.lib_get_categories()[0];
+        let cat_name = &ctx.get_library_categories()[0];
         let selected_book = if ctx
-            .lib_get_books()
+            .get_library_books()
             .get(cat_name)
             .expect("The first category should always exist but does not")
             .is_empty()
@@ -60,7 +60,7 @@ impl LibData {
 
     /// Selects the next category, wrapping around as required
     pub fn select_next_category(&mut self, ctx: &Context) {
-        let list_len = ctx.lib_get_categories().len();
+        let list_len = ctx.get_library_categories().len();
         self.current_category_idx = (self.current_category_idx + 1) % list_len;
 
         self.selected_book.select(None);
@@ -69,7 +69,7 @@ impl LibData {
 
     /// Selects the previous category, wrapping around as required
     pub fn select_previous_category(&mut self, ctx: &Context) {
-        let max_idx = ctx.lib_get_categories().len() - 1;
+        let max_idx = ctx.get_library_categories().len() - 1;
         if self.current_category_idx == 0 {
             self.current_category_idx = max_idx;
         } else {
@@ -94,10 +94,8 @@ impl LibData {
 
     /// Returns the size of the currently selected category
     pub fn get_current_category_size(&mut self, ctx: &Context) -> usize {
-        let cat_name = &ctx.lib_get_categories()[self.get_selected_category()];
-        trace_dbg!(cat_name.clone());
-        trace_dbg!(ctx.lib_get_books().keys());
-        ctx.lib_get_books().get(cat_name).unwrap().len()
+        let cat_name = &ctx.get_library_categories()[self.get_selected_category()];
+        ctx.get_library_books().get(cat_name).unwrap().len()
     }
 
     /// Returns a mutable reference to the state representing the selected book. This will always succeed
@@ -106,22 +104,13 @@ impl LibData {
     }
 
     /// Gets the currently selected book
-    pub fn get_selected_book<'a>(&self, ctx: &'a Context) -> Option<&'a Book> {
-        let idx = self.selected_book.selected()?;
-        let category_name = ctx.lib_get_categories().get(self.get_selected_category())?;
-
-        Some(&ctx.lib_get_books().get(category_name)?[idx])
-    }
-
-    /// Gets the currently selected book mutably
-    pub fn get_selected_book_mut<'a>(&self, ctx: &'a mut Context) -> Option<&'a mut Book> {
+    pub fn get_selected_book(&self, ctx: &Context) -> Option<BookRef> {
         let idx = self.selected_book.selected()?;
         let category_name = ctx
-            .lib_get_categories()
-            .get(self.get_selected_category())?
-            .to_string();
+            .get_library_categories()
+            .get(self.get_selected_category())?;
 
-        Some(&mut ctx.lib_get_books_mut().get_mut(&category_name)?[idx])
+        Some(ctx.get_library_books().get(category_name)?[idx].clone())
     }
 
     /// Selects the next book in the currently selected category. If no book is selected, the first book is selected

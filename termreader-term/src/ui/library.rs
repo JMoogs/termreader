@@ -73,7 +73,7 @@ pub(super) fn render_lib(rect: Rect, ctx: &Context, app_state: &mut AppState, f:
     if render_categories {
         // Render categories
         let categories: Vec<Line> = ctx
-            .lib_get_categories()
+            .get_library_categories()
             .clone()
             .into_iter()
             .map(|t| Line::from(t).alignment(Alignment::Center))
@@ -95,14 +95,14 @@ pub(super) fn render_lib(rect: Rect, ctx: &Context, app_state: &mut AppState, f:
 
     if render_books {
         let current_category =
-            &ctx.lib_get_categories()[app_state.lib_data.get_selected_category()];
+            &ctx.get_library_categories()[app_state.lib_data.get_selected_category()];
 
         let mut display_data: Vec<ListItem> = ctx
-            .lib_get_books()
+            .get_library_books()
             .get(current_category)
             .unwrap()
             .iter()
-            .map(|b| ListItem::new(b.display_info()).style(app_state.config.unselected_style))
+            .map(|b| ListItem::new(b.get_display_info()).style(app_state.config.unselected_style))
             .collect();
 
         let book_len = display_data.len();

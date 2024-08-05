@@ -93,10 +93,15 @@ fn run_app<B: Backend>(
                     }
                     RequestData::BookInfo((res, info)) => {
                         let novel = res?;
-                        let book = ctx
-                            .find_book_by_url_mut(novel.get_full_url().to_string())
-                            .map(|b| b.clone())
-                            .unwrap_or_else(|| Book::from_novel(novel));
+                        let book = match ctx.get_book_url(novel.get_full_url().to_string()) {
+                            Some(b) => b,
+                            None => {
+                                let book = Book::from_novel(novel);
+                                let book_id = book.get_id();
+                                ctx.add_book(book);
+                                ctx.get_book(book_id).expect("we just added the book")
+                            }
+                        };
 
                         match info {
                             BookInfoDetails::SourceWithOptions => {
@@ -109,15 +114,16 @@ fn run_app<B: Backend>(
                         }
                     }
                     RequestData::Chapter((book_info, res, ch)) => match book_info {
-                        BookInfo::NewBook(mut b) => {
-                            b.global_set_ch(ch);
-                            app_state.move_to_reader(b, Some(res?));
+                        BookInfo::NewBook(_b) => {
+                            unreachable!()
+                            // b.global_set_ch(ch);
+                            // app_state.move_to_reader(b, Some(res?));
                         }
                         BookInfo::ID(id) => {
-                            let book = ctx.find_book_mut(id);
+                            let book = ctx.get_book(id);
                             match book {
-                                    Some(b) => {
-                                        b.global_set_ch(ch);
+                                    Some(mut b) => {
+                                        b.global_set_chapter(ch).unwrap();
                                         app_state.move_to_reader(b.clone(), Some(res?) );
                                     },
                                     None => panic!("Book existed so we returned an ID, but we were unable to find it?"),

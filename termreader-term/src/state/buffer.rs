@@ -1,7 +1,7 @@
 // This module holds the buffer struct. This struct contains all temporary data required for the running of the TUI
 
 use crate::{helpers::StatefulList, ui::sources::BookViewOption};
-use termreader_core::book::Book;
+use termreader_core::book::BookRef;
 use termreader_sources::{chapter::ChapterPreview, novel::NovelPreview};
 
 pub struct Buffer {
@@ -12,11 +12,11 @@ pub struct Buffer {
     /// The chapter previews of a novel
     pub chapter_previews: StatefulList<ChapterPreview>,
     /// The novel/book currently being viewed
-    pub novel: Option<Book>,
+    pub novel: Option<BookRef>,
     /// How far scrolled the novel description is in a preview
     pub novel_preview_scroll: usize,
     /// A book being read directly from the sources page
-    pub book: Option<Book>,
+    pub book: Option<BookRef>,
     /// A temporary stateful list
     pub temporary_list: StatefulList<String>,
     /// A temporary book view option

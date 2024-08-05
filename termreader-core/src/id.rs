@@ -3,7 +3,7 @@ use std::time::SystemTime;
 
 /// An ID used to uniquely identify a book.
 /// Determined using the current timestamp, resulting in very little risk of collisions.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Eq, Hash)]
 pub struct ID {
     id: u128,
 }

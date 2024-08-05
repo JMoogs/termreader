@@ -3,17 +3,19 @@ use ratatui::{prelude::*, widgets::*};
 use termreader_core::Context;
 
 pub(super) fn render_updates(rect: Rect, ctx: &Context, app_state: &mut AppState, f: &mut Frame) {
-    let mut display_data: Vec<ListItem> =
-        ctx.updates_get().clone().into_iter().map(|e| {
-            let book_id = e.get_book_id();
+    let mut display_data: Vec<ListItem> = ctx
+        .get_updates()
+        .clone()
+        .into_iter()
+        .map(|e| {
             let chs = e.display_new_chs();
-            let book = ctx.lib_find_book(book_id).expect("All books in the updates category should have a corresponding library entry. It is an error for them to not.");
+            let book = e.get_book_ref();
 
             let st = format!("{} | {} | {}", book.get_name(), chs, e.get_timestamp());
 
             ListItem::new(st).style(app_state.config.unselected_style)
-
-        }).collect();
+        })
+        .collect();
 
     let entries_len = display_data.len();
     if entries_len == 0 {

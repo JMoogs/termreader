@@ -282,22 +282,15 @@ fn handle_typing(ctx: &mut Context, app_state: &mut AppState, key: KeyCode) {
                 }
                 Screen::Lib(LibScreen::BookView) => {
                     // Rename a book
-                    let book = app_state.lib_data
-                        .get_selected_book_mut(ctx)
+                    let mut book = app_state.lib_data
+                        .get_selected_book(ctx)
                         .expect("a book has not been selected, even though this menu is only accessible on a selected book");
                     let new_name = if app_state.buffer.text.is_empty() {
                         None
                     } else {
                         Some(app_state.buffer.text.clone())
                     };
-                    let new_name = rename_book(book, new_name);
-                    app_state
-                        .buffer
-                        .novel
-                        .as_mut()
-                        .expect("we're in book view so there must be a novel here")
-                        .global_get_novel_mut()
-                        .set_alias(new_name);
+                    rename_book(&mut book, new_name);
                 }
                 // Creating a category
                 Screen::Lib(LibScreen::CategoryOptions) => {
@@ -418,38 +411,38 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                     }
                                 }
                                 1 => {
-                                    // TODO: get rid of this workaround
                                     let book = app_state
                                         .lib_data
-                                        .get_selected_book_mut(ctx)
+                                        .get_selected_book(ctx)
                                         .expect("a book must be selected to be in this menu");
+                                    let id = book.get_id();
+                                    let source =
+                                        ctx.get_book_source(book.get_id()).unwrap().clone();
 
-                                    let source = book.clone().get_source(ctx);
-                                    let book = app_state
-                                        .lib_data
-                                        .get_selected_book_mut(ctx)
-                                        .expect("a book must be selected to be in this menu");
+                                    let mut real_book = book.get_book();
+                                    real_book.update(&source);
+                                    ctx.replace_book(id, real_book);
 
-                                    book.update(&source);
-                                    app_state.buffer.novel = Some(book.clone());
-                                    app_state.buffer.chapter_previews = StatefulList::from(
-                                        book.global_get_novel().get_chapters().clone(),
-                                    )
+                                    let book = ctx.get_book(id).unwrap();
+
+                                    app_state.buffer.chapter_previews =
+                                        StatefulList::from(book.get_chapters().unwrap());
+                                    app_state.buffer.novel = Some(book);
                                 }
                                 2 => enter_book_opts_categories(app_state, ctx),
                                 3 => enter_typing(app_state),
                                 4 => {
-                                    let book = app_state.lib_data
-                                        .get_selected_book_mut(ctx)
+                                    let mut book = app_state.lib_data
+                                        .get_selected_book(ctx)
                                         .expect("a book has not been selected, even though this menu is only accessible on a selected book");
                                     book.reset_progress();
                                 }
                                 5 => {
                                     let book_id = app_state.lib_data
-                                        .get_selected_book_mut(ctx)
+                                        .get_selected_book(ctx)
                                         .expect("a book has not been selected, even though this menu is only accessible on a selected book")
                                         .get_id();
-                                    ctx.lib_remove_book(book_id);
+                                    ctx.remove_from_lib(book_id);
                                     app_state.lib_data.reset_selection(ctx);
                                     app_state.lib_data.global_selected_book_opts.select_first();
                                     app_state.update_screen(Screen::Lib(LibScreen::Main))
@@ -476,13 +469,15 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                 1 => {
                                     let novel = app_state.buffer.novel.clone().unwrap();
 
-                                    if ctx.lib_in_lib_url(novel.get_full_url().unwrap().to_string())
+                                    if !ctx
+                                        .get_book_url(novel.get_full_url().unwrap().to_string())
+                                        .is_some_and(|b| b.in_library())
                                     {
                                         add_book_to_lib(app_state, ctx, novel);
                                         // TODO: maybe remove this?
                                         app_state.screen = app_state.prev_screens.pop().unwrap();
                                     } else {
-                                        ctx.lib_remove_book(novel.get_id())
+                                        ctx.remove_from_lib(novel.get_id())
                                     }
                                     app_state.source_data.swap_library_options();
                                 }
@@ -516,8 +511,7 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                         .history_data
                                         .get_selected_book(&ctx)
                                         .expect("a book should be selected here")
-                                        .get_book()
-                                        .get_id();
+                                        .get_book_id();
                                     remove_history_entry(app_state, ctx, book);
                                     // Here it makes sense to return to the history screen
                                     app_state.update_screen(Screen::History(HistoryScreen::Main));
@@ -528,7 +522,7 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                         .history_data
                                         .get_selected_book(&ctx)
                                         .expect("a book should be selected here")
-                                        .get_book();
+                                        .get_book_ref();
                                     let link = book.get_full_url().unwrap();
                                     open::that_detached(link).unwrap();
                                 }
@@ -538,13 +532,14 @@ fn control_book_view_opts(ctx: &mut Context, app_state: &mut AppState, key: KeyC
                                         .history_data
                                         .get_selected_book(&ctx)
                                         .expect("a book should be selected here")
-                                        .get_book()
-                                        .clone();
+                                        .get_book_ref();
 
-                                    if ctx.lib_find_book(book.get_id()).is_some() {
-                                        ctx.lib_remove_book(book.get_id())
+                                    if book.in_library() {
+                                        ctx.remove_from_lib(book.get_id());
                                     } else {
-                                        ctx.lib_add_book(book, None)
+                                        ctx.add_to_lib(book.get_id(), None).expect(
+                                            "we've checked that the book isn't in the library",
+                                        );
                                     }
                                     app_state.history_data.swap_library_options();
                                 }
@@ -622,15 +617,10 @@ fn control_history_menu(ctx: &Context, app_state: &mut AppState, key: KeyCode) {
             let Some(entry) = b else {
                 return;
             };
-            if entry.get_book().is_local() {
+            if entry.get_book_ref().is_local() {
                 unimplemented!()
             } else {
-                enter_book_view(
-                    app_state,
-                    ctx,
-                    entry.get_book().clone(),
-                    BookViewType::History,
-                );
+                enter_book_view(app_state, ctx, entry.get_book_ref(), BookViewType::History);
             }
         }
         _ => (),

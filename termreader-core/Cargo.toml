@@ -12,12 +12,14 @@ license.workspace = true
 
 [dependencies]
 termreader-sources = { path = "../termreader-sources" }
-serde = { version = "1.0.188", features = ["derive"]}
+serde = { version = "1.0.188", features = ["derive", "rc" ]}
 serde_json = "1.0.107"
-anyhow = "1.0.75"
+# anyhow = "1.0.75"
 directories = "5.0.1"
 lazy_static = "1.4.0"
 tracing = "0.1.40"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 sha256 = "1.4.0"
+thiserror = "1.0.63"
+serde_with = "3.9.0"

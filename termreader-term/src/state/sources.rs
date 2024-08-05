@@ -104,14 +104,14 @@ impl SourceData {
 
     /// Selects the next source
     pub fn select_next(&mut self, ctx: &Context) {
-        let size = ctx.source_get_info().len();
+        let size = ctx.get_source_info().len();
         let sel = self.selected_source.selected().unwrap();
         self.selected_source.select(Some((sel + 1) % size))
     }
 
     /// Selects the previous source
     pub fn select_prev(&mut self, ctx: &Context) {
-        let size = ctx.source_get_info().len();
+        let size = ctx.get_source_info().len();
         let sel = self.selected_source.selected().unwrap();
         if sel == 0 {
             self.selected_source.select(Some(size - 1));
@@ -122,6 +122,6 @@ impl SourceData {
 
     pub fn get_selected_source_id(&self, ctx: &Context) -> SourceID {
         let idx = self.selected_source.selected().unwrap();
-        ctx.source_get_info()[idx].0
+        ctx.get_source_info()[idx].0
     }
 }

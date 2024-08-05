@@ -90,7 +90,7 @@ impl Scrape for Source {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Sources {
     sources: Vec<Source>,
 }

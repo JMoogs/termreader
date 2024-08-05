@@ -1,6 +1,6 @@
 use termreader_sources::sources::{Source, SourceID, Sources};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(super) struct SourceContext {
     sources: Sources,
 }

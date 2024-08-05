@@ -16,7 +16,7 @@ pub(super) fn render_sources(rect: Rect, ctx: &Context, app_state: &mut AppState
         match s {
             SourceScreen::Main | SourceScreen::Select => {
                 let display_data: Vec<ListItem> = ctx
-                    .source_get_info()
+                    .get_source_info()
                     .into_iter()
                     .map(|(_, name)| ListItem::new(name).style(app_state.config.unselected_style))
                     .collect();
@@ -135,7 +135,7 @@ pub fn render_book_view(
     let novel = app_state.buffer.novel.as_ref().unwrap();
 
     // Title
-    let title = Paragraph::new(novel.global_get_novel().get_alias_or_name())
+    let title = Paragraph::new(novel.get_name())
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -159,7 +159,7 @@ pub fn render_book_view(
         block
     };
 
-    let synopsis = Paragraph::new(novel.global_get_novel().get_synopsis())
+    let synopsis = Paragraph::new(novel.get_synopsis())
         .block(block)
         .wrap(Wrap { trim: true });
 
@@ -257,12 +257,12 @@ pub fn render_book_view(
         .as_ref()
         .unwrap()
         .get_chapters()
-        .clone();
+        .unwrap();
 
     // Completed chapters should be displayed in a different style
     let read_chapters = {
-        if let Some(b) = ctx.find_book_by_url(novel.global_get_novel().get_full_url().to_string()) {
-            b.get_all_ch_progress().clone()
+        if let Some(b) = ctx.get_book_url(novel.get_full_url().unwrap()) {
+            b.get_all_chapter_progress().clone()
         } else {
             std::collections::HashMap::new()
         }
@@ -286,13 +286,6 @@ pub fn render_book_view(
         list.push(item);
     }
 
-    // let list: Vec<ListItem> = chapters
-    //     .into_iter()
-    //     .map(|i| {
-    //         ListItem::new(format!("{}: {}", i.get_chapter_no(), i.get_name()))
-    //             .style(app_state.config.unselected_style)
-    //     })
-    //     .collect();
     let ch_count = list.len();
 
     let block = Block::default()

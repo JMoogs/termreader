@@ -1,9 +1,7 @@
 use crate::helpers::StatefulList;
 use crate::state::reader::ReaderData;
 use crate::state::updates::UpdatesData;
-use crate::trace_dbg;
-use std::time::SystemTime;
-use termreader_core::book::Book;
+use termreader_core::book::BookRef;
 use termreader_core::Context;
 use termreader_sources::chapter::Chapter;
 
@@ -120,7 +118,7 @@ impl AppState {
     }
 
     /// Moves the user into the reader
-    pub fn move_to_reader(&mut self, book: Book, chapter: Option<Chapter>) {
+    pub fn move_to_reader(&mut self, book: BookRef, chapter: Option<Chapter>) {
         self.reader_data.set_data(book, chapter);
         self.prev_screens = Vec::new();
         self.screen = Screen::Reader;
@@ -131,45 +129,41 @@ impl AppState {
         if self.reader_data.get_book().is_none() {
             return;
         }
-        let mut b = self.reader_data.get_book_mut().as_mut().unwrap().clone();
+        // let mut b = self.reader_data.get_book_mut().as_mut().unwrap().clone();
+        let mut b = self.reader_data.get_book().unwrap();
 
         // Set the chapter progress
         if !b.is_local() {
-            let current_ch = b.global_get_current_ch();
+            let current_ch = b.get_current_ch().unwrap();
             b.global_set_progress(
                 self.reader_data
                     .get_ch_progress()
                     .expect("A book should be selected at this point"),
                 current_ch,
             );
-            trace_dbg!("Set chapter progress");
-            trace_dbg!(self.reader_data.get_ch_progress().unwrap());
         } else {
             todo!()
         }
 
-        // If the book is in library then update the copy in the lib
-        // FIXME: Check that this isn't just an empty copy
-        if let Some(book) = ctx.lib_find_book_mut(b.get_id()) {
-            let _ = std::mem::replace(book, b.clone());
-            trace_dbg!("Updated book with copy");
-        }
+        // NOTE: In theory this isn't needed with BookRef
+        // // If the book is in library then update the copy in the lib
+        // // FIXME: Check that this isn't just an empty copy
+        // if let Some(book) = ctx.lib_find_book_mut(b.get_id()) {
+        //     let _ = std::mem::replace(book, b.clone());
+        //     trace_dbg!("Updated book with copy");
+        // }
 
         // Add to the history
+
+        // NOTE: In theory this also isn't needed with BookRef
 
         // Remove any entries with the same ID
         // FIXME: This should probably be done on another field as temporary
         // books are assigned an ID that will end up being unique.
         // Maybe do it on the full novel link (hash works for local books)
-        ctx.hist_remove_entry(b.get_id());
+        ctx.remove_history_entry(b.get_id());
 
-        let timestamp = {
-            let now = SystemTime::now();
-            now.duration_since(SystemTime::UNIX_EPOCH)
-                .expect("Time has gone very backwards...")
-        }
-        .as_secs();
-        ctx.hist_add_entry(b.clone(), timestamp);
+        ctx.add_history_entry(b.get_id());
         // We added to history so we can select the first entry
         // (it doesn't matter if there's already one selected or not)
         self.history_data.get_selected_entry_mut().select(Some(0));

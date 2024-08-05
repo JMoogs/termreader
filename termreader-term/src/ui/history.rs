@@ -41,7 +41,7 @@ pub(super) fn render_history(rect: Rect, ctx: &Context, app_state: &mut AppState
 
     if render_books {
         let mut display_data: Vec<ListItem> = {
-            ctx.hist_get()
+            ctx.get_history()
                 .clone()
                 .into_iter()
                 .map(|e| {

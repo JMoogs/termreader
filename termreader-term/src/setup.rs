@@ -9,7 +9,7 @@ use crate::{
     },
     ui::sources::BookViewOption,
 };
-use termreader_core::{book::Book, history::HistoryEntry, id::ID, Context};
+use termreader_core::{book::BookRef, history::HistoryEntry, id::ID, Context};
 use termreader_sources::{
     novel::NovelPreview,
     sources::{Scrape, SortOrder, SourceID},
@@ -64,30 +64,24 @@ pub fn continue_reading_global_select(
     app_state: &mut AppState,
     ctx: &mut Context,
 ) -> Result<(), EntryError> {
-    let Some(book) = app_state.lib_data.get_selected_book_mut(ctx) else {
+    let Some(mut book) = app_state.lib_data.get_selected_book(ctx) else {
         return Err(EntryError::UnselectedLibBook);
     };
 
     let id = book.get_id();
-    let novel = book.global_get_novel().clone();
     let ch = match book.global_get_next_ordered_chap() {
         Some(c) => c,
         None => return Err(EntryError::NoChapters),
     };
 
-    let source_id = book.global_get_source_id();
-    let source = ctx
-        .source_get_by_id(source_id)
-        .expect("source was taken from book but it doesn't exist")
-        .clone();
+    let source = ctx.get_book_source(id).unwrap().clone();
+    let novel_path = book.get_url().unwrap();
+    let chapter_path = book.get_chapter_url(ch).unwrap();
     let tx = app_state.channel.get_sender();
 
     app_state.channel.loading = true;
     thread::spawn(move || {
-        let text = source.parse_chapter(
-            novel.get_url().to_string(),
-            novel.get_chapter_url(ch).unwrap().to_string(),
-        );
+        let text = source.parse_chapter(novel_path, chapter_path);
         let _ = tx.send(RequestData::Chapter((BookInfo::ID(id), text, ch)));
     });
 
@@ -112,8 +106,8 @@ pub enum BookViewType {
 }
 
 /// Enter a book view, given a book
-pub fn enter_book_view(app_state: &mut AppState, ctx: &Context, book: Book, view: BookViewType) {
-    app_state.buffer.chapter_previews = StatefulList::from(book.get_chapters().clone());
+pub fn enter_book_view(app_state: &mut AppState, ctx: &Context, book: BookRef, view: BookViewType) {
+    app_state.buffer.chapter_previews = StatefulList::from(book.get_chapters().unwrap());
     app_state.buffer.novel = Some(book);
     match view {
         BookViewType::Source => {
@@ -125,16 +119,19 @@ pub fn enter_book_view(app_state: &mut AppState, ctx: &Context, book: Book, view
             app_state.source_data.reset_novel_options();
 
             // Swap to removing
-            if ctx.lib_in_lib_url(
-                app_state
-                    .buffer
-                    .novel
-                    .as_ref()
-                    .expect("we just added the book to the buffer")
-                    .get_full_url()
-                    .unwrap()
-                    .to_string(),
-            ) {
+            if ctx
+                .get_book_url(
+                    app_state
+                        .buffer
+                        .novel
+                        .as_ref()
+                        .expect("we just added the book to the buffer")
+                        .get_full_url()
+                        .unwrap()
+                        .to_string(),
+                )
+                .is_some_and(|x| x.in_library())
+            {
                 app_state.source_data.swap_library_options()
             }
 
@@ -157,7 +154,7 @@ pub fn enter_book_view(app_state: &mut AppState, ctx: &Context, book: Book, view
             // If the book is in the library, have an option to remove it
             // otherwise have an option to add it
             if ctx
-                .lib_find_book(
+                .get_book(
                     app_state
                         .buffer
                         .novel
@@ -165,7 +162,7 @@ pub fn enter_book_view(app_state: &mut AppState, ctx: &Context, book: Book, view
                         .expect("we just added the book to the buffer")
                         .get_id(),
                 )
-                .is_some()
+                .is_some_and(|b| b.in_library())
             {
                 app_state
                     .history_data
@@ -191,7 +188,7 @@ pub fn search_book_details(
     view_type: BookInfoDetails,
 ) -> Result<(), SourceError> {
     let url = novel.get_url().to_string();
-    let Some(source) = ctx.source_get_by_id(source_id) else {
+    let Some(source) = ctx.get_source_by_id(source_id) else {
         return Err(SourceError::NonExistent);
     };
     let source = source.clone();
@@ -207,13 +204,13 @@ pub fn search_book_details(
 }
 
 pub fn enter_category_select(app_state: &mut AppState, ctx: &Context) {
-    let cats = ctx.lib_get_categories().clone();
+    let cats = ctx.get_library_categories().clone();
     app_state.buffer.temporary_list = StatefulList::from(cats);
     app_state.update_screen(Screen::Lib(LibScreen::CategorySelect));
 }
 
 pub fn enter_book_opts_categories(app_state: &mut AppState, ctx: &Context) {
-    let cats = ctx.lib_get_categories().clone();
+    let cats = ctx.get_library_categories().clone();
     app_state.buffer.temporary_list = StatefulList::from(cats);
     app_state.update_screen(Screen::Lib(LibScreen::BookViewCategory));
 }
@@ -233,9 +230,8 @@ pub fn move_book_category(app_state: &mut AppState, ctx: &mut Context) -> Result
     let Some(cat_idx) = cat_idx else {
         return Err(EntryError::UnselectedCategory);
     };
-    // .expect("there should always be a category selected");
 
-    ctx.lib_move_book_category(b, Some(&ctx.lib_get_categories()[cat_idx].clone()));
+    ctx.move_book_category(b, Some(&ctx.get_library_categories()[cat_idx].clone()));
 
     app_state.lib_data.reset_selection(ctx);
     app_state.lib_data.global_selected_book_opts.select_first();
@@ -248,15 +244,15 @@ pub fn delete_category(
     ctx: &mut Context,
     category_name: String,
 ) -> Result<(), ()> {
-    if ctx.lib_delete_category(category_name).is_ok() {
+    if ctx.delete_library_category(category_name).is_ok() {
         // If we deleted the last category, and it's currently selected,
         // We subtract one
-        if ctx.lib_get_categories().len() == app_state.lib_data.get_selected_category() {
+        if ctx.get_library_categories().len() == app_state.lib_data.get_selected_category() {
             app_state.lib_data.current_category_idx =
                 app_state.lib_data.current_category_idx.saturating_sub(1);
         }
 
-        let cats = ctx.lib_get_categories().clone();
+        let cats = ctx.get_library_categories().clone();
         app_state.buffer.temporary_list = StatefulList::from(cats);
         Ok(())
     } else {
@@ -269,8 +265,8 @@ pub fn create_category(
     ctx: &mut Context,
     category_name: String,
 ) -> Result<(), ()> {
-    if ctx.lib_create_category(category_name).is_ok() {
-        let cats = ctx.lib_get_categories().clone();
+    if ctx.create_library_category(category_name).is_ok() {
+        let cats = ctx.get_library_categories().clone();
         app_state.buffer.temporary_list = StatefulList::from(cats);
         Ok(())
     } else {
@@ -285,12 +281,12 @@ pub fn move_category_up(app_state: &mut AppState, ctx: &mut Context) {
         .selected_idx()
         .expect("a category should always be selected");
 
-    let Some(new_pos) = ctx.lib_reorder_category_up(cat) else {
+    let Some(new_pos) = ctx.reorder_category_forwards(cat) else {
         return;
     };
 
     // Fix the list to reflect the new state
-    let cats = ctx.lib_get_categories().clone();
+    let cats = ctx.get_library_categories().clone();
     app_state.buffer.temporary_list = StatefulList::from(cats);
     app_state
         .buffer
@@ -306,12 +302,12 @@ pub fn move_category_down(app_state: &mut AppState, ctx: &mut Context) {
         .selected_idx()
         .expect("a category should always be selected");
 
-    let Some(new_pos) = ctx.lib_reorder_category_down(cat) else {
+    let Some(new_pos) = ctx.reorder_category_backwards(cat) else {
         return;
     };
 
     // Fix the list to reflect the new state
-    let cats = ctx.lib_get_categories().clone();
+    let cats = ctx.get_library_categories().clone();
     app_state.buffer.temporary_list = StatefulList::from(cats);
     app_state
         .buffer
@@ -326,9 +322,9 @@ pub fn rename_category(app_state: &mut AppState, ctx: &mut Context, new_name: St
         .temporary_list
         .selected()
         .expect("a category should always be selected");
-    ctx.lib_rename_category(old_name.to_string(), new_name);
+    ctx.rename_library_category(old_name.to_string(), new_name);
 
-    let cats = ctx.lib_get_categories().clone();
+    let cats = ctx.get_library_categories().clone();
     app_state.buffer.temporary_list = StatefulList::from(cats);
 }
 
@@ -336,13 +332,20 @@ pub fn rename_category(app_state: &mut AppState, ctx: &mut Context, new_name: St
 pub fn start_book_from_beginning(
     app_state: &mut AppState,
     ctx: &Context,
-    book: Book,
+    book: BookRef,
 ) -> Result<(), BookError> {
+    if book.is_local() {
+        unimplemented!()
+    }
+
     let (b_info, source) = {
-        if book.global_get_total_chs() == 0 {
+        if book.get_total_ch_count().expect("invariants were checked") == 0 {
             return Err(BookError::NoChapters);
         }
-        let source = book.get_source(ctx);
+        let source = ctx
+            .get_book_source(book.get_id())
+            .expect("invariants were checked")
+            .clone();
         (BookInfo::ID(book.get_id()), source)
     };
 
@@ -366,18 +369,27 @@ pub fn start_book_from_beginning(
 pub fn start_book_from_ch(
     app_state: &mut AppState,
     ctx: &Context,
-    book: Book,
+    book: BookRef,
     chapter: usize,
 ) -> Result<(), BookError> {
+    if book.is_local() {
+        unimplemented!()
+    }
+
     let (b_info, source) = {
-        if book.global_get_total_chs() < chapter {
+        if book.get_total_ch_count().expect("invariants were checked") < chapter {
             return Err(BookError::NoChapters);
         }
-        let source = book.get_source(ctx);
-        let info = if ctx.find_book(book.get_id()).is_some() {
+        let source = ctx
+            .get_book_source(book.get_id())
+            .expect("invariants were checked")
+            .clone();
+
+        let info = if ctx.book_exists(book.get_id()) {
             BookInfo::ID(book.get_id())
         } else {
-            BookInfo::NewBook(book.clone())
+            unreachable!()
+            // BookInfo::NewBook(book.clone())
         };
         (info, source)
     };
@@ -389,8 +401,6 @@ pub fn start_book_from_ch(
 
     app_state.channel.loading = true;
     thread::spawn(move || {
-        // We checked there's at least 1 chapter
-        #[allow(clippy::unwrap_used)]
         let text = source.parse_chapter(novel_path, chapter_path);
         let _ = tx.send(RequestData::Chapter((b_info, text, chapter)));
     });
@@ -400,14 +410,14 @@ pub fn start_book_from_ch(
 
 pub fn continue_book_history(app_state: &mut AppState, ctx: &Context, entry: &HistoryEntry) {
     let ch = entry.get_chapter();
-    let book = entry.get_book();
-    let id = book.get_id();
+    let book = entry.get_book_ref();
+    let id = entry.get_book_id();
 
-    let source = book.get_source(ctx);
+    let source = ctx.get_book_source(id).unwrap().clone();
     let tx = app_state.channel.get_sender();
 
-    let novel_path = book.get_url().unwrap().to_string();
-    let chapter_path = book.get_chapter_url(ch).unwrap().to_string();
+    let novel_path = book.get_url().unwrap();
+    let chapter_path = book.get_chapter_url(ch).unwrap();
 
     app_state.channel.loading = true;
     thread::spawn(move || {
@@ -425,19 +435,19 @@ pub fn goto_next_ch(app_state: &mut AppState, ctx: &mut Context) -> Result<(), B
 
     let id = book.get_id();
 
-    let ch = if book.global_get_current_ch() + 1 <= book.global_get_total_chs() {
-        book.global_get_current_ch() + 1
+    let ch = if book.get_current_ch().unwrap() + 1 <= book.get_total_ch_count().unwrap() {
+        book.get_current_ch().unwrap() + 1
     } else {
         return Err(BookError::UnavailableChapter);
     };
 
-    let source = book.get_source(ctx);
+    let source = ctx.get_book_source(id).unwrap().clone();
 
     let tx = app_state.channel.get_sender();
 
     app_state.channel.loading = true;
     let novel_path = book.get_url().unwrap().to_string();
-    let chapter_path = book.get_chapter_url(1).unwrap().to_string();
+    let chapter_path = book.get_chapter_url(ch).unwrap().to_string();
 
     thread::spawn(move || {
         let text = source.parse_chapter(novel_path, chapter_path);
@@ -456,16 +466,16 @@ pub fn goto_prev_ch(app_state: &mut AppState, ctx: &mut Context) -> Result<(), B
 
     let id = book.get_id();
 
-    let ch = if book.global_get_current_ch() != 1 {
-        book.global_get_current_ch() - 1
+    let ch = if book.get_current_ch().unwrap() != 1 {
+        book.get_current_ch().unwrap() - 1
     } else {
         return Err(BookError::UnavailableChapter);
     };
 
-    let source = book.get_source(ctx);
+    let source = ctx.get_book_source(id).unwrap().clone();
 
-    let novel_path = book.get_url().unwrap().to_string();
-    let chapter_path = book.get_chapter_url(1).unwrap().to_string();
+    let novel_path = book.get_url().unwrap();
+    let chapter_path = book.get_chapter_url(ch).unwrap();
 
     let tx = app_state.channel.get_sender();
     app_state.channel.loading = true;
@@ -480,14 +490,14 @@ pub fn goto_prev_ch(app_state: &mut AppState, ctx: &mut Context) -> Result<(), B
 
 pub fn remove_history_entry(app_state: &mut AppState, ctx: &mut Context, book: ID) {
     // Remove book
-    ctx.hist_remove_entry(book);
+    ctx.remove_history_entry(book);
 
     // Select the previous entry if one exists, otherwise select none
     let sel = app_state.history_data.get_selected_entry_mut().selected();
     match sel {
         Some(n) => {
             if n == 0 {
-                if ctx.hist_get_len() == 0 {
+                if ctx.get_history_entry_count() == 0 {
                     app_state.history_data.get_selected_entry_mut().select(None);
                 } else {
                     app_state
@@ -514,7 +524,7 @@ pub fn search_source(
     source_id: SourceID,
     search_term: Option<String>,
 ) -> Result<(), SourceError> {
-    let Some(source) = ctx.source_get_by_id(source_id) else {
+    let Some(source) = ctx.get_source_by_id(source_id) else {
         return Err(SourceError::NonExistent);
     };
     let source = source.clone();
@@ -537,7 +547,7 @@ pub fn search_source(
 }
 
 /// Rename a book, setting it's name back to the default if a new name isn't given. Returns the resulting name.
-pub fn rename_book(book: &mut Book, new_name: Option<String>) -> String {
+pub fn rename_book(book: &mut BookRef, new_name: Option<String>) -> String {
     if let Some(n) = new_name {
         book.rename(n.clone());
         n
@@ -545,15 +555,17 @@ pub fn rename_book(book: &mut Book, new_name: Option<String>) -> String {
         if book.is_local() {
             todo!()
         } else {
-            let n = book.global_get_novel().get_name().to_string();
+            let n = book
+                .global_get_original_name()
+                .expect("invariants were checked");
             book.rename(n.clone());
             n
         }
     }
 }
 
-pub fn add_book_to_lib(app_state: &mut AppState, ctx: &mut Context, book: Book) {
-    ctx.lib_add_book(book, None);
+pub fn add_book_to_lib(app_state: &mut AppState, ctx: &mut Context, book: BookRef) {
+    ctx.add_to_lib(book.get_id(), None);
     // Select this book if there were previously no books selected
     app_state.lib_data.fix_book_selection_state(ctx);
 }

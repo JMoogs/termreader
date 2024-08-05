@@ -41,7 +41,7 @@ fn render_bottom(rect: Rect, app_state: &AppState, f: &mut Frame) {
     let display = if book.is_local() {
         format!("{} | {}", title, time)
     } else {
-        let ch = book.global_get_current_ch();
+        let ch = book.get_current_ch().unwrap();
         let ch_name = app_state
             .reader_data
             .get_chapter()
