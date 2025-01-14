@@ -1,3 +1,7 @@
 /target
 books.json
 history.json
+.envrc
+.direnv
+.idea
+log
