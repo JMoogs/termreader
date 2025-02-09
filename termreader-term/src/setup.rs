@@ -231,7 +231,8 @@ pub fn move_book_category(app_state: &mut AppState, ctx: &mut Context) -> Result
         return Err(EntryError::UnselectedCategory);
     };
 
-    ctx.move_book_category(b, Some(&ctx.get_library_categories()[cat_idx].clone()));
+    ctx.move_book_category(b, Some(&ctx.get_library_categories()[cat_idx].clone()))
+        .unwrap();
 
     app_state.lib_data.reset_selection(ctx);
     app_state.lib_data.global_selected_book_opts.select_first();
@@ -322,7 +323,7 @@ pub fn rename_category(app_state: &mut AppState, ctx: &mut Context, new_name: St
         .temporary_list
         .selected()
         .expect("a category should always be selected");
-    ctx.rename_library_category(old_name.to_string(), new_name);
+    let _ = ctx.rename_library_category(old_name.to_string(), new_name);
 
     let cats = ctx.get_library_categories().clone();
     app_state.buffer.temporary_list = StatefulList::from(cats);
@@ -565,7 +566,7 @@ pub fn rename_book(book: &mut BookRef, new_name: Option<String>) -> String {
 }
 
 pub fn add_book_to_lib(app_state: &mut AppState, ctx: &mut Context, book: BookRef) {
-    ctx.add_to_lib(book.get_id(), None);
+    let _ = ctx.add_to_lib(book.get_id(), None);
     // Select this book if there were previously no books selected
     app_state.lib_data.fix_book_selection_state(ctx);
 }

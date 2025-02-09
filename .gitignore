@@ -5,3 +5,4 @@ history.json
 .direnv
 .idea
 log
+.ignore

@@ -9,7 +9,7 @@ use std::{fs, path::PathBuf};
 
 pub(super) fn store_library(library: LibraryContext, path: &PathBuf) -> Result<(), TRError> {
     let data = LibCtxSerialize::from_lib_ctx(library);
-    let json = if cfg!(debug_assertations) {
+    let json = if cfg!(debug_assertions) {
         serde_json::to_string_pretty(&data)?
     } else {
         serde_json::to_string(&data)?
@@ -32,7 +32,7 @@ pub(super) fn load_library(
 
 pub(super) fn store_history(history: HistoryContext, path: &PathBuf) -> Result<(), TRError> {
     let data = HistCtxSerialize::from_hist_ctx(history);
-    let json = if cfg!(debug_assertations) {
+    let json = if cfg!(debug_assertions) {
         serde_json::to_string_pretty(&data)?
     } else {
         serde_json::to_string(&data)?
@@ -55,7 +55,7 @@ pub(super) fn load_history(
 
 pub(super) fn store_updates(updates: UpdatesContext, path: &PathBuf) -> Result<(), TRError> {
     let data = UpdatesCtxSerialize::from_updates_ctx(updates);
-    let json = if cfg!(debug_assertations) {
+    let json = if cfg!(debug_assertions) {
         serde_json::to_string_pretty(&data)?
     } else {
         serde_json::to_string(&data)?
@@ -77,7 +77,7 @@ pub(super) fn load_updates(
 }
 
 pub(super) fn store_books(books: &BooksContext, path: &PathBuf) -> Result<(), TRError> {
-    let json = if cfg!(debug_assertations) {
+    let json = if cfg!(debug_assertions) {
         serde_json::to_string_pretty(books)?
     } else {
         serde_json::to_string(books)?

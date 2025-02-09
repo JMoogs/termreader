@@ -140,7 +140,8 @@ impl AppState {
                     .get_ch_progress()
                     .expect("A book should be selected at this point"),
                 current_ch,
-            );
+            )
+            .expect("book is global");
         } else {
             todo!()
         }
